@@ -1,0 +1,25 @@
+# dépendances
+node_modules/
+.pnpm-store/
+
+# build
+.next/
+out/
+dist/
+build/
+
+# environnement
+.env
+.env.*
+!.env.example
+
+# vercel
+.vercel
+
+# outils
+.superpowers/
+.DS_Store
+*.log
+coverage/
+playwright-report/
+test-results/
