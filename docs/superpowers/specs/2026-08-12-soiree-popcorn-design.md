@@ -105,13 +105,14 @@ movies
   runtime                integer                 -- minutes
   vote_average           real
   vote_count             integer
-  popularity_percentile  double precision NOT NULL DEFAULT 0   -- 0 = obscur, 1 = très populaire
+  popularity             real                                  -- valeur brute TMDB
+  popularity_percentile  double precision NOT NULL DEFAULT 0   -- rang relatif, 0 = obscur, 1 = très populaire
   genres                 text[]      NOT NULL DEFAULT '{}'     -- en français
   keywords               text[]      NOT NULL DEFAULT '{}'     -- en français, via dictionnaire
   providers              text[]      NOT NULL DEFAULT '{}'     -- 'netflix' | 'canal' | 'disney'
   in_top200              boolean     NOT NULL DEFAULT false
   director               text
-  dominant_colors        text[]      NOT NULL DEFAULT '{}'     -- 2 couleurs hex, pour le fond « teinté »
+  detail_fetched_at      timestamptz                           -- suivi de l'ingestion, NULL = détail à récupérer
   updated_at             timestamptz NOT NULL DEFAULT now()
   INDEX GIN (genres), GIN (keywords), GIN (providers)
   INDEX (release_year), (vote_average), (in_top200)
@@ -165,10 +166,12 @@ Les deux clés primaires composites font le gros du travail de robustesse : `swi
 L'ordre ne se stocke pas, il se calcule. Chaque film reçoit une clé de tri dérivée du code du salon et de son identifiant, pondérée par la popularité :
 
 ```
-u        = md5(code_salon || ':' || id_film), 8 premiers caractères hexadécimaux
-           convertis en entier, divisés par 0xFFFFFFFF          → u ∈ [0, 1)
+u        = md5(code_salon || ':' || id_film), 7 premiers caractères hexadécimaux
+           convertis en entier, divisés par 0xFFFFFFF           → u ∈ [0, 1)
 cle_tri  = u × (1.30 − 0.60 × popularity_percentile)
 ```
+
+Sept caractères et non huit : 28 bits tiennent dans un entier signé Postgres sans jamais activer le bit de signe, donc `::bit(28)::int` est toujours positif. Sur 32 bits, la même conversion produirait des valeurs négatives pour la moitié des films et inverserait leur ordre. La précision perdue est sans effet sur un mélange.
 
 Tri croissant sur `cle_tri`.
 
@@ -199,8 +202,8 @@ WHERE (cardinality(:genres) = 0 OR m.genres && :genres)
         SELECT 1 FROM swipes s
         WHERE s.member_id = :me AND s.movie_id = m.id
       )
-ORDER BY (('x' || substr(md5(:room || ':' || m.id::text), 1, 8))::bit(32)::bigint::double precision
-          / 4294967295.0)
+ORDER BY (('x' || substr(md5(:room || ':' || m.id::text), 1, 7))::bit(28)::int::double precision
+          / 268435455.0)
          * (1.30 - 0.60 * m.popularity_percentile)
 LIMIT 20;
 ```
@@ -351,7 +354,9 @@ Quatre par thème, choisis dans les réglages :
 | 3 | Motif d'étagère discret | Texture velours |
 | 4 | Teinté par l'affiche | Teinté par l'affiche |
 
-Le fond « teinté » extrait les couleurs dominantes de l'affiche courante (calculées à l'ingestion et stockées, pas à l'exécution) et les fait transiter à chaque carte.
+Le fond « teinté » extrait les deux couleurs dominantes de l'affiche courante et les fait transiter à chaque carte.
+
+L'extraction se fait **dans le navigateur**, sur l'affiche déjà chargée et affichée, avec mise en cache locale par film. L'alternative — calculer les couleurs à l'ingestion — imposerait de télécharger les 10 000 affiches côté serveur, soit plusieurs centaines de mégaoctets, pour deux valeurs que le navigateur obtient gratuitement à partir d'une image qu'il possède déjà.
 
 ### 8.4 Animations de match
 
@@ -416,8 +421,11 @@ Script `scripts/ingest.ts`, exécuté une fois à la main puis chaque semaine pa
 4. **Détail.** Pour chaque identifiant unique, `/movie/{id}?language=fr-FR&append_to_response=keywords,credits,watch/providers` → synopsis français, durée, genres français, mots-clés bruts, réalisateur (`credits.crew`, `job = Director`), plateformes.
 5. **Tags.** Les mots-clés bruts passent par `data/keywords-fr.json` ; ceux qui n'y figurent pas sont ignorés plutôt qu'affichés en anglais. Quatre tags au maximum sont retenus, mots-clés d'abord, genres ensuite.
 6. **Popularité.** `popularity_percentile` est calculé comme le rang de popularité rapporté à l'effectif total, une fois la collecte terminée.
-7. **Couleurs.** Les deux couleurs dominantes de l'affiche sont extraites et stockées pour le fond « teinté ».
-8. **Écriture.** Upsert par identifiant. Un film qui disparaît d'une plateforme voit son tableau `providers` mis à jour ; il reste en base s'il appartient au top 200.
+7. **Écriture.** Upsert par identifiant. Un film qui disparaît d'une plateforme voit son tableau `providers` mis à jour ; il reste en base s'il appartient au top 200.
+
+L'ingestion se déroule en trois phases dont la progression est portée par la base et non par un fichier d'état : la phase 1 pose une ligne minimale par film recensé, la phase 2 complète tous les films dont `detail_fetched_at` est nul, la phase 3 calcule les percentiles de popularité. Interrompue à n'importe quel moment, elle reprend exactement où elle s'était arrêtée.
+
+Les quatre tags affichés ne sont pas stockés : ils se recomposent à l'affichage à partir de `keywords` et `genres`. Stocker un dérivé de deux colonnes déjà présentes obligerait à le régénérer à chaque évolution du dictionnaire.
 
 **Robustesse.** Huit requêtes en parallèle, repli exponentiel sur les réponses 429, curseur de progression dans `ingest_state`. Le script est idempotent et reprenable : interrompu, il repart où il s'était arrêté.
 
