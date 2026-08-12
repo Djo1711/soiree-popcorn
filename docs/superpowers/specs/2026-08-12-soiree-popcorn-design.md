@@ -395,8 +395,23 @@ Cookie `sp_session`, `HttpOnly`, `SameSite=Lax`, `Secure`, durée un an. Contenu
 
 Script `scripts/ingest.ts`, exécuté une fois à la main puis chaque semaine par Vercel Cron.
 
-1. **Résolution des plateformes.** Appel de `/watch/providers/movie?watch_region=FR` et sélection des entrées correspondant à Netflix, Disney+ et Canal. **Les identifiants ne sont jamais codés en dur** : MyCanal apparaît sous plusieurs noms et ces identifiants changent. Le filtre `with_watch_monetization_types=flatrate` écarte nativement Canal VOD, qui relève de la location.
-2. **Collecte par plateforme.** `/discover/movie` avec `watch_region=FR`, `with_watch_providers`, `with_watch_monetization_types=flatrate`, `language=fr-FR`. TMDB plafonne à 500 pages par requête ; au-delà, la collecte est découpée par tranches d'années.
+1. **Résolution des plateformes.** Appel de `/watch/providers/movie?watch_region=FR` et sélection des entrées correspondant à Netflix, Disney+ et Canal. **Les identifiants ne sont jamais codés en dur** : ils sont résolus par nom à chaque exécution, car ils changent. Le filtre `with_watch_monetization_types=flatrate` écarte nativement Canal VOD, qui relève de la location.
+
+   Valeurs vérifiées le 12 août 2026 (94 fournisseurs référencés en France) :
+
+   | Identifiant | Nom | Retenu |
+   |---|---|---|
+   | 8 | Netflix | oui |
+   | 1796 | Netflix Standard with Ads | oui |
+   | 337 | Disney Plus | oui |
+   | 381 | Canal+ | oui — c'est MyCanal |
+   | 58 | Canal VOD | **non**, location |
+
+   Les deux entrées Netflix se recoupent très largement ; elles sont collectées toutes les deux et le dédoublonnage par identifiant de film fait le tri, ce qui évite de parier sur une inclusion.
+
+2. **Collecte par plateforme.** `/discover/movie` avec `watch_region=FR`, `with_watch_providers`, `with_watch_monetization_types=flatrate`, `language=fr-FR`.
+
+   **La collecte se fait plateforme par plateforme, jamais en une seule requête combinée.** TMDB plafonne les résultats à 500 pages : une requête `8|1796|337|381` renvoie 9 971 films sur 499 pages, soit à un cheveu du plafond, et perdrait silencieusement des films dès que le catalogue grossit. Prises séparément, toutes les plateformes restent loin du plafond — Netflix 353 pages, Netflix avec pub 348, Disney+ 124, Canal+ 41. Si l'une d'elles venait à s'approcher de 500 pages, sa collecte serait découpée par tranches d'années.
 3. **Top 200.** `/movie/top_rated?language=fr-FR`, pages 1 à 10, marqués `in_top200 = true`.
 4. **Détail.** Pour chaque identifiant unique, `/movie/{id}?language=fr-FR&append_to_response=keywords,credits,watch/providers` → synopsis français, durée, genres français, mots-clés bruts, réalisateur (`credits.crew`, `job = Director`), plateformes.
 5. **Tags.** Les mots-clés bruts passent par `data/keywords-fr.json` ; ceux qui n'y figurent pas sont ignorés plutôt qu'affichés en anglais. Quatre tags au maximum sont retenus, mots-clés d'abord, genres ensuite.
@@ -406,7 +421,7 @@ Script `scripts/ingest.ts`, exécuté une fois à la main puis chaque semaine pa
 
 **Robustesse.** Huit requêtes en parallèle, repli exponentiel sur les réponses 429, curseur de progression dans `ingest_state`. Le script est idempotent et reprenable : interrompu, il repart où il s'était arrêté.
 
-**Ordre de grandeur.** Environ 6 000 films, une trentaine de mégaoctets, 15 à 40 minutes pour le premier passage.
+**Ordre de grandeur, mesuré et non estimé.** Netflix 7 060 films, Netflix avec pub 6 945, Disney+ 2 479, Canal+ 813 ; 9 971 après application du OR par TMDB, auxquels s'ajoute le top 200. Après dédoublonnage, compter **environ 10 000 films** et une cinquantaine de mégaoctets. Le premier passage demande à peu près 870 requêtes de liste et 10 000 requêtes de détail, soit 15 à 30 minutes avec huit requêtes en parallèle.
 
 ### Construction du dictionnaire
 
@@ -507,7 +522,5 @@ Films uniquement, pas de séries. Aucun compte, mot de passe ni e-mail. Aucune n
 
 ## 16. Points à confirmer à l'implémentation
 
-Deux incertitudes assumées, à lever par vérification et non par supposition :
-
-1. **Identifiants des plateformes MyCanal.** Résolus à l'exécution depuis `/watch/providers/movie?watch_region=FR`. À vérifier au premier lancement du script d'ingestion que les bonnes entrées sont retenues et que Canal VOD est bien exclu.
+1. ~~**Identifiants des plateformes MyCanal.**~~ **Levé le 12 août 2026** par appel réel à l'API : MyCanal correspond à Canal+ (381), Canal VOD (58) est bien une entrée distincte et écartée. Volumes mesurés et plafond de pagination documentés au § 10.
 2. **Fréquence du cron sur le plan Vercel gratuit.** Une planification hebdomadaire devrait passer, le plan gratuit limitant à des exécutions quotidiennes ou moins fréquentes. À confirmer au déploiement ; à défaut, le rafraîchissement se fera par une commande lancée à la main, ce qui reste acceptable pour un catalogue qui bouge lentement.
