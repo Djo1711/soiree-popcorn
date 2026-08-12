@@ -20,6 +20,6 @@ export function deckSortKey(
 ): number {
   const hex = createHash('md5').update(`${roomCode}:${movieId}`).digest('hex').slice(0, 7)
   const u = parseInt(hex, 16) / HASH_MAX
-  const p = Math.min(1, Math.max(0, popularityPercentile))
+  const p = Number.isNaN(popularityPercentile) ? 0 : Math.min(1, Math.max(0, popularityPercentile))
   return u * (BASE_WEIGHT - POPULARITY_WEIGHT * p)
 }

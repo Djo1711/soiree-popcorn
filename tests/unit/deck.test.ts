@@ -35,7 +35,9 @@ describe('deckSortKey', () => {
         .map(({ index }) => index)
       return positions.reduce((a, b) => a + b, 0) / positions.length
     }
-    expect(positionMoyenne(0)).toBeLessThan(positionMoyenne(1))
+    // Un écart de 150 places discrimine réellement : la formule pondérée sépare
+    // les deux groupes d'environ 239 places, une formule sans pondération de 23.
+    expect(positionMoyenne(1) - positionMoyenne(0)).toBeGreaterThan(150)
   })
 
   it('ne rend jamais un film obscur inatteignable', () => {
@@ -51,5 +53,9 @@ describe('deckSortKey', () => {
   it('borne un percentile hors intervalle', () => {
     expect(deckSortKey('K4P2M9', 42, 5)).toBe(deckSortKey('K4P2M9', 42, 1))
     expect(deckSortKey('K4P2M9', 42, -5)).toBe(deckSortKey('K4P2M9', 42, 0))
+  })
+
+  it('traite un percentile NaN comme nul plutôt que de propager NaN', () => {
+    expect(deckSortKey('K4P2M9', 42, Number.NaN)).toBe(deckSortKey('K4P2M9', 42, 0))
   })
 })
