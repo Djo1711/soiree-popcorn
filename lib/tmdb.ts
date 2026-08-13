@@ -2,6 +2,10 @@ import type { ProviderKey } from '@/lib/db/schema'
 
 const BASE_URL = 'https://api.themoviedb.org/3'
 const MAX_ATTEMPTS = 6
+/** Délai maximal d'une requête : une connexion qui pend ne doit pas figer l'ingestion. */
+const REQUEST_TIMEOUT_MS = 15_000
+/** Plafond de repli : un « retry-after » aberrant ne doit pas geler l'ingestion pendant des heures. */
+const MAX_BACKOFF_MS = 60_000
 
 export interface TmdbProvider {
   provider_id: number
@@ -53,6 +57,18 @@ export const PROVIDER_MATCHERS: { key: ProviderKey; test: (name: string) => bool
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/** Repli exponentiel : 500 ms, 1 s, 2 s, 4 s, 8 s, plafonné. */
+const backoffMs = (attempt: number) => Math.min(MAX_BACKOFF_MS, 2 ** (attempt - 1) * 500)
+
+/** Respecte « retry-after » quand il est exploitable, sans jamais dépasser le plafond. */
+function attenteApres(response: Response, attempt: number): number {
+  const retryAfter = Number(response.headers.get('retry-after'))
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(MAX_BACKOFF_MS, retryAfter * 1000)
+  }
+  return backoffMs(attempt)
+}
+
 export interface TmdbClientOptions {
   token?: string
   fetchImpl?: typeof fetch
@@ -83,23 +99,34 @@ export class TmdbClient {
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const response = await this.fetchImpl(url, {
-        headers: { Authorization: `Bearer ${this.token}`, accept: 'application/json' },
-      })
+      let response: Response
+      try {
+        response = await this.fetchImpl(url, {
+          headers: { Authorization: `Bearer ${this.token}`, accept: 'application/json' },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch (erreur) {
+        // Coupure réseau ou délai dépassé : réessayable, contrairement à un refus du serveur.
+        if (attempt === MAX_ATTEMPTS) {
+          throw new Error(
+            `TMDB injoignable sur ${path} après ${MAX_ATTEMPTS} tentatives : ${(erreur as Error).message}`,
+          )
+        }
+        await this.sleepImpl(backoffMs(attempt))
+        continue
+      }
 
       if (response.ok) return (await response.json()) as T
 
       const recuperable = response.status === 429 || response.status >= 500
       if (!recuperable) throw new Error(`TMDB a répondu ${response.status} sur ${path}`)
       if (attempt === MAX_ATTEMPTS) {
-        throw new Error(`TMDB a répondu ${response.status} sur ${path} après 6 tentatives`)
+        throw new Error(
+          `TMDB a répondu ${response.status} sur ${path} après ${MAX_ATTEMPTS} tentatives`,
+        )
       }
 
-      const retryAfter = Number(response.headers.get('retry-after'))
-      const attente = Number.isFinite(retryAfter) && retryAfter > 0
-        ? retryAfter * 1000
-        : 2 ** (attempt - 1) * 500
-      await this.sleepImpl(attente)
+      await this.sleepImpl(attenteApres(response, attempt))
     }
 
     throw new Error('inatteignable')

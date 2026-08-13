@@ -5,8 +5,11 @@ function fakeResponse(body: unknown, status = 200, headers: Record<string, strin
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-function client(fetchImpl: typeof fetch) {
-  return new TmdbClient({ token: 'jeton-de-test', fetchImpl, sleepImpl: async () => {} })
+function client(
+  fetchImpl: typeof fetch,
+  sleepImpl: (ms: number) => Promise<void> = async () => {},
+) {
+  return new TmdbClient({ token: 'jeton-de-test', fetchImpl, sleepImpl })
 }
 
 describe('TmdbClient', () => {
@@ -44,6 +47,63 @@ describe('TmdbClient', () => {
     const fetchImpl = vi.fn(async () => fakeResponse({}, 404))
     await expect(client(fetchImpl as unknown as typeof fetch).movieDetail(1)).rejects.toThrow(/404/)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('applique un repli exponentiel de 500 ms puis 1 s', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 500))
+      .mockResolvedValueOnce(fakeResponse({}, 503))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([500, 1000])
+  })
+
+  it('convertit retry-after de secondes en millisecondes', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 429, { 'retry-after': '2' }))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([2000])
+  })
+
+  it('plafonne un retry-after aberrant à une minute', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 429, { 'retry-after': '999999999' }))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([60_000])
+  })
+
+  it('réessaie après une coupure réseau au lieu d’abandonner l’ingestion', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValueOnce(
+        fakeResponse({ results: [{ provider_id: 8, provider_name: 'Netflix' }] }),
+      )
+
+    const providers = await client(fetchImpl as unknown as typeof fetch).listProviders()
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(providers).toEqual([{ provider_id: 8, provider_name: 'Netflix' }])
   })
 })
 

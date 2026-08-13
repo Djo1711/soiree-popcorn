@@ -1559,8 +1559,11 @@ function fakeResponse(body: unknown, status = 200, headers: Record<string, strin
   return new Response(JSON.stringify(body), { status, headers })
 }
 
-function client(fetchImpl: typeof fetch) {
-  return new TmdbClient({ token: 'jeton-de-test', fetchImpl, sleepImpl: async () => {} })
+function client(
+  fetchImpl: typeof fetch,
+  sleepImpl: (ms: number) => Promise<void> = async () => {},
+) {
+  return new TmdbClient({ token: 'jeton-de-test', fetchImpl, sleepImpl })
 }
 
 describe('TmdbClient', () => {
@@ -1598,6 +1601,63 @@ describe('TmdbClient', () => {
     const fetchImpl = vi.fn(async () => fakeResponse({}, 404))
     await expect(client(fetchImpl as unknown as typeof fetch).movieDetail(1)).rejects.toThrow(/404/)
     expect(fetchImpl).toHaveBeenCalledTimes(1)
+  })
+
+  it('applique un repli exponentiel de 500 ms puis 1 s', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 500))
+      .mockResolvedValueOnce(fakeResponse({}, 503))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([500, 1000])
+  })
+
+  it('convertit retry-after de secondes en millisecondes', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 429, { 'retry-after': '2' }))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([2000])
+  })
+
+  it('plafonne un retry-after aberrant à une minute', async () => {
+    const delais: number[] = []
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValueOnce(fakeResponse({}, 429, { 'retry-after': '999999999' }))
+      .mockResolvedValueOnce(fakeResponse({ results: [] }))
+
+    await client(fetchImpl as unknown as typeof fetch, async (ms) => {
+      delais.push(ms)
+    }).listProviders()
+
+    expect(delais).toEqual([60_000])
+  })
+
+  it('réessaie après une coupure réseau au lieu d’abandonner l’ingestion', async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockRejectedValueOnce(new Error('socket hang up'))
+      .mockResolvedValueOnce(
+        fakeResponse({ results: [{ provider_id: 8, provider_name: 'Netflix' }] }),
+      )
+
+    const providers = await client(fetchImpl as unknown as typeof fetch).listProviders()
+
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
+    expect(providers).toEqual([{ provider_id: 8, provider_name: 'Netflix' }])
   })
 })
 
@@ -1649,6 +1709,10 @@ import type { ProviderKey } from '@/lib/db/schema'
 
 const BASE_URL = 'https://api.themoviedb.org/3'
 const MAX_ATTEMPTS = 6
+/** Délai maximal d'une requête : une connexion qui pend ne doit pas figer l'ingestion. */
+const REQUEST_TIMEOUT_MS = 15_000
+/** Plafond de repli : un « retry-after » aberrant ne doit pas geler l'ingestion pendant des heures. */
+const MAX_BACKOFF_MS = 60_000
 
 export interface TmdbProvider {
   provider_id: number
@@ -1700,6 +1764,18 @@ export const PROVIDER_MATCHERS: { key: ProviderKey; test: (name: string) => bool
 
 const sleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms))
 
+/** Repli exponentiel : 500 ms, 1 s, 2 s, 4 s, 8 s, plafonné. */
+const backoffMs = (attempt: number) => Math.min(MAX_BACKOFF_MS, 2 ** (attempt - 1) * 500)
+
+/** Respecte « retry-after » quand il est exploitable, sans jamais dépasser le plafond. */
+function attenteApres(response: Response, attempt: number): number {
+  const retryAfter = Number(response.headers.get('retry-after'))
+  if (Number.isFinite(retryAfter) && retryAfter > 0) {
+    return Math.min(MAX_BACKOFF_MS, retryAfter * 1000)
+  }
+  return backoffMs(attempt)
+}
+
 export interface TmdbClientOptions {
   token?: string
   fetchImpl?: typeof fetch
@@ -1730,23 +1806,34 @@ export class TmdbClient {
     }
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-      const response = await this.fetchImpl(url, {
-        headers: { Authorization: `Bearer ${this.token}`, accept: 'application/json' },
-      })
+      let response: Response
+      try {
+        response = await this.fetchImpl(url, {
+          headers: { Authorization: `Bearer ${this.token}`, accept: 'application/json' },
+          signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        })
+      } catch (erreur) {
+        // Coupure réseau ou délai dépassé : réessayable, contrairement à un refus du serveur.
+        if (attempt === MAX_ATTEMPTS) {
+          throw new Error(
+            `TMDB injoignable sur ${path} après ${MAX_ATTEMPTS} tentatives : ${(erreur as Error).message}`,
+          )
+        }
+        await this.sleepImpl(backoffMs(attempt))
+        continue
+      }
 
       if (response.ok) return (await response.json()) as T
 
       const recuperable = response.status === 429 || response.status >= 500
       if (!recuperable) throw new Error(`TMDB a répondu ${response.status} sur ${path}`)
       if (attempt === MAX_ATTEMPTS) {
-        throw new Error(`TMDB a répondu ${response.status} sur ${path} après 6 tentatives`)
+        throw new Error(
+          `TMDB a répondu ${response.status} sur ${path} après ${MAX_ATTEMPTS} tentatives`,
+        )
       }
 
-      const retryAfter = Number(response.headers.get('retry-after'))
-      const attente = Number.isFinite(retryAfter) && retryAfter > 0
-        ? retryAfter * 1000
-        : 2 ** (attempt - 1) * 500
-      await this.sleepImpl(attente)
+      await this.sleepImpl(attenteApres(response, attempt))
     }
 
     throw new Error('inatteignable')
@@ -1801,7 +1888,7 @@ export class TmdbClient {
 pnpm vitest run tests/unit/tmdb.test.ts
 ```
 
-Attendu : `6 passed`.
+Attendu : `10 passed`.
 
 - [ ] **Step 5: Commit**
 
