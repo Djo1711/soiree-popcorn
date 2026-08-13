@@ -542,15 +542,19 @@ describe('shouldCreateMatch', () => {
     expect(shouldCreateMatch(['djo', 'alice'], ['djo'])).toBe(false)
   })
 
-  it('ne crée jamais de match dans un salon d’une seule personne', () => {
-    expect(shouldCreateMatch(['djo'], ['djo'])).toBe(false)
+  it(‘ne crée jamais de match dans un salon d’une seule personne’, () => {
+    expect(shouldCreateMatch([‘djo’], [‘djo’])).toBe(false)
   })
 
-  it('ne crée jamais de match dans un salon vide', () => {
+  it(‘ne se laisse pas duper par un identifiant en double’, () => {
+    expect(shouldCreateMatch([‘solo’, ‘solo’], [‘solo’])).toBe(false)
+  })
+
+  it(‘ne crée jamais de match dans un salon vide’, () => {
     expect(shouldCreateMatch([], [])).toBe(false)
   })
 
-  it('exige que les trois membres aient aimé', () => {
+  it(‘exige que les trois membres aient aimé’, () => {
     expect(shouldCreateMatch(['a', 'b', 'c'], ['a', 'b', 'c'])).toBe(true)
     expect(shouldCreateMatch(['a', 'b', 'c'], ['a', 'b'])).toBe(false)
   })
@@ -586,9 +590,10 @@ export function shouldCreateMatch(
   memberIds: string[],
   likedByMemberIds: Iterable<string>,
 ): boolean {
-  if (memberIds.length < 2) return false
+  const membresDistincts = new Set(memberIds)
+  if (membresDistincts.size < 2) return false
   const liked = new Set(likedByMemberIds)
-  return memberIds.every((id) => liked.has(id))
+  return Array.from(membresDistincts).every((id) => liked.has(id))
 }
 ```
 
@@ -598,7 +603,7 @@ export function shouldCreateMatch(
 pnpm vitest run tests/unit/match.test.ts
 ```
 
-Attendu : `6 passed`.
+Attendu : `7 passed`.
 
 - [ ] **Step 5: Commit**
 

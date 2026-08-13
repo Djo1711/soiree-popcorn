@@ -9,7 +9,8 @@ export function shouldCreateMatch(
   memberIds: string[],
   likedByMemberIds: Iterable<string>,
 ): boolean {
-  if (memberIds.length < 2) return false
+  const membresDistincts = new Set(memberIds)
+  if (membresDistincts.size < 2) return false
   const liked = new Set(likedByMemberIds)
-  return memberIds.every((id) => liked.has(id))
+  return Array.from(membresDistincts).every((id) => liked.has(id))
 }

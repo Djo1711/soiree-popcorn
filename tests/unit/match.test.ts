@@ -14,6 +14,10 @@ describe('shouldCreateMatch', () => {
     expect(shouldCreateMatch(['djo'], ['djo'])).toBe(false)
   })
 
+  it('ne se laisse pas duper par un identifiant en double', () => {
+    expect(shouldCreateMatch(['solo', 'solo'], ['solo'])).toBe(false)
+  })
+
   it('ne crée jamais de match dans un salon vide', () => {
     expect(shouldCreateMatch([], [])).toBe(false)
   })
