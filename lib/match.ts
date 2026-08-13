@@ -1,18 +1,42 @@
+export const MIN_MEMBERS = 2
+export const MAX_MEMBERS = 8
+
+export interface MatchRule {
+  /** Effectif annoncé à la création du salon, entre MIN_MEMBERS et MAX_MEMBERS. */
+  expectedMembers: number
+  /** Nombre de « j'aime » requis, entre MIN_MEMBERS et expectedMembers. */
+  threshold: number
+}
+
 /**
- * Un match naît quand *tous* les membres du salon ont aimé le film.
+ * Un match naît quand deux conditions sont réunies : l'effectif annoncé est au
+ * complet, et le nombre de membres ayant aimé le film atteint le seuil.
  *
- * Écrit pour N membres plutôt que pour 2 : cela ne coûte rien aujourd'hui et
- * permettra d'inviter des amis sans réécriture. Le garde-fou sur la taille du
- * salon empêche une personne seule de matcher avec elle-même. Les identifiants
- * sont dédupliqués avant le comptage, de sorte qu'un identifiant dupliqué ne
- * peut pas feindre l'adhésion d'un deuxième participant.
+ * Les identifiants sont dédoublonnés avant d'être comptés, pour qu'un doublon
+ * ne puisse pas faire passer une personne pour deux participants.
+ *
+ * Le seuil existe parce que l'unanimité ne passe pas à l'échelle : à huit
+ * personnes aimant chacune 40 % des films, elle survient dans 0,07 % des cas.
+ * Son plancher de 2 empêche qu'un seul avis décide pour le groupe.
  */
 export function shouldCreateMatch(
   memberIds: string[],
   likedByMemberIds: Iterable<string>,
+  rule: MatchRule,
 ): boolean {
+  const { expectedMembers, threshold } = rule
+
+  if (!Number.isInteger(expectedMembers) || !Number.isInteger(threshold)) return false
+  if (expectedMembers < MIN_MEMBERS || expectedMembers > MAX_MEMBERS) return false
+  if (threshold < MIN_MEMBERS || threshold > expectedMembers) return false
+
   const membresDistincts = new Set(memberIds)
-  if (membresDistincts.size < 2) return false
+  if (membresDistincts.size !== expectedMembers) return false
+
   const liked = new Set(likedByMemberIds)
-  return Array.from(membresDistincts).every((id) => liked.has(id))
+  let votes = 0
+  for (const id of membresDistincts) {
+    if (liked.has(id)) votes++
+  }
+  return votes >= threshold
 }
