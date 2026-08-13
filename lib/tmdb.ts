@@ -7,6 +7,18 @@ const REQUEST_TIMEOUT_MS = 15_000
 /** Plafond de repli : un « retry-after » aberrant ne doit pas geler l'ingestion pendant des heures. */
 const MAX_BACKOFF_MS = 60_000
 
+/** Erreur HTTP TMDB, porteuse du code pour distinguer un 404 définitif d'une panne passagère. */
+export class TmdbHttpError extends Error {
+  constructor(
+    readonly status: number,
+    readonly path: string,
+    message: string,
+  ) {
+    super(message)
+    this.name = 'TmdbHttpError'
+  }
+}
+
 export interface TmdbProvider {
   provider_id: number
   provider_name: string
@@ -119,9 +131,13 @@ export class TmdbClient {
       if (response.ok) return (await response.json()) as T
 
       const recuperable = response.status === 429 || response.status >= 500
-      if (!recuperable) throw new Error(`TMDB a répondu ${response.status} sur ${path}`)
+      if (!recuperable) {
+        throw new TmdbHttpError(response.status, path, `TMDB a répondu ${response.status} sur ${path}`)
+      }
       if (attempt === MAX_ATTEMPTS) {
-        throw new Error(
+        throw new TmdbHttpError(
+          response.status,
+          path,
           `TMDB a répondu ${response.status} sur ${path} après ${MAX_ATTEMPTS} tentatives`,
         )
       }
@@ -173,3 +189,8 @@ export class TmdbClient {
     })
   }
 }
+
+/** Sous-ensemble de `TmdbClient` utilisé par la phase 1 — un faux client léger suffit en test. */
+export type ClientCollecte = Pick<TmdbClient, 'resolveProviderIds' | 'discover' | 'topRated'>
+/** Sous-ensemble de `TmdbClient` utilisé par la phase 2 — un faux client léger suffit en test. */
+export type ClientDetail = Pick<TmdbClient, 'movieDetail'>

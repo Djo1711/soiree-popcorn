@@ -1,7 +1,13 @@
 import { sql } from 'drizzle-orm'
 import { translateKeywords } from '@/lib/keywords'
 import type { ProviderKey } from '@/lib/db/schema'
-import { TmdbClient, type TmdbMovieDetail } from '@/lib/tmdb'
+import {
+  TmdbClient,
+  TmdbHttpError,
+  type ClientCollecte,
+  type ClientDetail,
+  type TmdbMovieDetail,
+} from '@/lib/tmdb'
 
 /** Toute base Postgres pilotée par Drizzle : Neon en production, PGlite en test. */
 type AnyDb = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
@@ -9,6 +15,8 @@ type AnyDb = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
 const TOP_RATED_PAGES = 10
 const DETAIL_CONCURRENCY = 8
 const DETAIL_BATCH = 200
+/** Au-delà, on considère la panne systémique et on arrête plutôt que de vider le catalogue. */
+const MAX_ECHECS_CONSECUTIFS = 25
 
 export function mapDetailToRow(detail: TmdbMovieDetail) {
   const genres = detail.genres.map((g) => g.name)
@@ -49,7 +57,7 @@ export function mapDetailToRow(detail: TmdbMovieDetail) {
 
 /** Phase 1 — recense les identifiants et pose une ligne minimale par film. */
 export async function collectCatalogue(
-  client: TmdbClient,
+  client: ClientCollecte,
   db: AnyDb,
   log: (message: string) => void,
 ): Promise<number> {
@@ -115,13 +123,24 @@ async function upsertStub(
   `)
 }
 
-/** Phase 2 — complète les films dont le détail manque. */
+/**
+ * Phase 2 — complète les films dont le détail manque.
+ *
+ * Seul un 404 (absence définitive côté TMDB) marque `detail_fetched_at` en
+ * échec : toute autre erreur — jeton révoqué, page anti-bot, coupure réseau
+ * épuisant ses tentatives — laisse la ligne intacte pour qu'une relance la
+ * retente. Un compteur d'échecs consécutifs interrompt l'ingestion avant
+ * qu'une panne systémique ne fasse échouer les dix mille appels restants en
+ * quelques secondes.
+ */
 export async function fetchDetails(
-  client: TmdbClient,
+  client: ClientDetail,
   db: AnyDb,
   log: (message: string) => void,
 ): Promise<number> {
   let complets = 0
+  let echecsConsecutifs = 0
+  let derniereErreur = ''
 
   for (;;) {
     const result = (await db.execute(sql`
@@ -129,6 +148,8 @@ export async function fetchDetails(
     `)) as { rows: { id: number }[] }
     const ids = result.rows.map((r) => Number(r.id))
     if (ids.length === 0) break
+
+    let traitesDansLeLot = 0
 
     for (let i = 0; i < ids.length; i += DETAIL_CONCURRENCY) {
       const lot = ids.slice(i, i + DETAIL_CONCURRENCY)
@@ -157,14 +178,40 @@ export async function fetchDetails(
               WHERE id = ${id}
             `)
             complets++
+            traitesDansLeLot++
+            echecsConsecutifs = 0
           } catch (error) {
-            log(`Film ${id} ignoré : ${(error as Error).message}`)
-            await db.execute(sql`UPDATE movies SET detail_fetched_at = now() WHERE id = ${id}`)
+            if (error instanceof TmdbHttpError && error.status === 404) {
+              // Absence définitive : inutile de retenter, mais ce n'est pas un
+              // signe de panne systémique, donc le compteur d'échecs reste intact.
+              log(`Film ${id} absent de TMDB (404), marqué comme traité.`)
+              await db.execute(sql`UPDATE movies SET detail_fetched_at = now() WHERE id = ${id}`)
+              traitesDansLeLot++
+              return
+            }
+
+            derniereErreur = (error as Error).message
+            echecsConsecutifs++
+            log(`Film ${id} en échec, sera retenté à la prochaine exécution : ${derniereErreur}`)
+
+            if (echecsConsecutifs >= MAX_ECHECS_CONSECUTIFS) {
+              throw new Error(
+                `Arrêt de l'ingestion après ${echecsConsecutifs} échecs consécutifs — ` +
+                  `dernière erreur : ${derniereErreur}`,
+              )
+            }
           }
         }),
       )
     }
     log(`Phase 2 : ${complets} films complétés…`)
+
+    if (traitesDansLeLot === 0) {
+      throw new Error(
+        `Arrêt de l'ingestion : aucun film traité sur ce lot de ${ids.length}, ` +
+          'la relance bouclerait indéfiniment sur les mêmes identifiants.',
+      )
+    }
   }
 
   return complets
