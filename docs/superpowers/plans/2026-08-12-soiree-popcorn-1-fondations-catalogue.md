@@ -77,9 +77,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx scripts/migrate.ts",
-    "ingest": "tsx scripts/ingest.ts",
-    "keywords": "tsx scripts/build-keywords.ts"
+    "db:migrate": "tsx --env-file=.env.local scripts/migrate.ts",
+    "ingest": "tsx --env-file=.env.local scripts/ingest.ts",
+    "keywords": "tsx --env-file=.env.local scripts/build-keywords.ts"
   },
   "dependencies": {
     "next": "^15.1.0",
@@ -1291,7 +1291,6 @@ export default {
 `scripts/migrate.ts` :
 
 ```ts
-import 'dotenv/config'
 import { migrate } from 'drizzle-orm/neon-serverless/migrator'
 import { db, pool } from '@/lib/db/client'
 
@@ -1300,11 +1299,7 @@ await pool.end()
 console.log('Migrations appliquées.')
 ```
 
-Ajouter `dotenv` aux dépendances de développement :
-
-```bash
-pnpm add -D dotenv
-```
+Les scripts chargent `.env.local` via l'option native `--env-file` de Node 20, déclarée dans les commandes `package.json` ci-dessus. Ne pas utiliser `dotenv/config` : il lit `.env` et non `.env.local`, et en ESM son effet de bord s'exécuterait de toute façon après l'import de `lib/db/client.ts`, qui échoue à la lecture d'un `DATABASE_URL` absent.
 
 - [ ] **Step 3: Générer la migration**
 
@@ -2120,7 +2115,6 @@ Attendu : ÉCHEC — `Failed to resolve import "@/scripts/ingest"`.
 `scripts/ingest.ts` :
 
 ```ts
-import 'dotenv/config'
 import { sql } from 'drizzle-orm'
 import { translateKeywords } from '@/lib/keywords'
 import type { ProviderKey } from '@/lib/db/schema'
@@ -2386,7 +2380,6 @@ git commit -m "Ajoute l'ingestion du catalogue TMDB en trois phases reprenables"
 `scripts/build-keywords.ts` :
 
 ```ts
-import 'dotenv/config'
 import { writeFile } from 'node:fs/promises'
 import { sql } from 'drizzle-orm'
 import dictionary from '@/data/keywords-fr.json'

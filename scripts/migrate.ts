@@ -1,4 +1,3 @@
-import 'dotenv/config'
 import { migrate } from 'drizzle-orm/neon-serverless/migrator'
 import { db, pool } from '@/lib/db/client'
 
