@@ -678,16 +678,22 @@ describe('effectif incomplet', () => {
     expect(shouldCreateMatch(salon(5), salon(5), { expectedMembers: 6, threshold: 4 })).toBe(false)
   })
 
-  it('matche dès que le dernier arrivant complète l’effectif', () => {
+  it(‘matche dès que le dernier arrivant complète l’effectif’, () => {
     expect(shouldCreateMatch(salon(6), salon(6), { expectedMembers: 6, threshold: 4 })).toBe(true)
   })
 
-  it('ne compte pas un identifiant dupliqué comme un participant de plus', () => {
-    expect(shouldCreateMatch(['solo', 'solo'], ['solo'], unanimite(2))).toBe(false)
+  it(‘ne matche pas si plus de monde que prévu a rejoint’, () => {
+    // 7 participants distincts pour un effectif annoncé de 6 : la comparaison
+    // doit être une égalité stricte, sinon un salon en surnombre matcherait.
+    expect(shouldCreateMatch(salon(7), salon(7), { expectedMembers: 6, threshold: 4 })).toBe(false)
+  })
+
+  it(‘ne compte pas un identifiant dupliqué comme un participant de plus’, () => {
+    expect(shouldCreateMatch([‘solo’, ‘solo’], [‘solo’], unanimite(2))).toBe(false)
   })
 })
 
-describe('seuil', () => {
+describe(‘seuil’, () => {
   it('matche à deux quand les deux ont aimé', () => {
     expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice'], unanimite(2))).toBe(true)
   })
@@ -794,7 +800,7 @@ export function shouldCreateMatch(
 pnpm vitest run tests/unit/match.test.ts
 ```
 
-Attendu : `15 passed`.
+Attendu : `16 passed`.
 
 - [ ] **Step 5: Vérifier que le seuil discrimine réellement**
 

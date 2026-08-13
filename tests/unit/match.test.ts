@@ -17,23 +17,29 @@ describe('bornes', () => {
     expect(shouldCreateMatch(salon(9), salon(9), unanimite(9))).toBe(false)
   })
 
-  it('refuse un seuil inférieur à 2, pour qu’un seul avis ne décide jamais', () => {
+  it('refuse un seuil inférieur à 2, pour qu\'un seul avis ne décide jamais', () => {
     expect(shouldCreateMatch(salon(4), ['m1'], { expectedMembers: 4, threshold: 1 })).toBe(false)
   })
 
-  it('refuse un seuil supérieur à l’effectif', () => {
+  it('refuse un seuil supérieur à l\'effectif', () => {
     expect(shouldCreateMatch(salon(4), salon(4), { expectedMembers: 4, threshold: 5 })).toBe(false)
   })
 })
 
 describe('effectif incomplet', () => {
-  it('ne matche pas tant que tout le monde n’a pas rejoint', () => {
+  it('ne matche pas tant que tout le monde n\'a pas rejoint', () => {
     // 5 arrivés sur 6 annoncés, tous les 5 ont aimé, seuil de 4 pourtant atteint
     expect(shouldCreateMatch(salon(5), salon(5), { expectedMembers: 6, threshold: 4 })).toBe(false)
   })
 
-  it('matche dès que le dernier arrivant complète l’effectif', () => {
+  it('matche dès que le dernier arrivant complète l\'effectif', () => {
     expect(shouldCreateMatch(salon(6), salon(6), { expectedMembers: 6, threshold: 4 })).toBe(true)
+  })
+
+  it('ne matche pas si plus de monde que prévu a rejoint', () => {
+    // 7 participants distincts pour un effectif annoncé de 6 : la comparaison
+    // doit être une égalité stricte, sinon un salon en surnombre matcherait.
+    expect(shouldCreateMatch(salon(7), salon(7), { expectedMembers: 6, threshold: 4 })).toBe(false)
   })
 
   it('ne compte pas un identifiant dupliqué comme un participant de plus', () => {
@@ -60,14 +66,14 @@ describe('seuil', () => {
     expect(shouldCreateMatch(salon(6), aime, { expectedMembers: 6, threshold: 4 })).toBe(false)
   })
 
-  it('exige l’unanimité quand le seuil vaut l’effectif', () => {
+  it('exige l\'unanimité quand le seuil vaut l\'effectif', () => {
     expect(shouldCreateMatch(salon(8), salon(8), unanimite(8))).toBe(true)
     expect(shouldCreateMatch(salon(8), salon(7), unanimite(8))).toBe(false)
   })
 })
 
 describe('likes étrangers au salon', () => {
-  it('ignore le like de quelqu’un qui a quitté le salon', () => {
+  it('ignore le like de quelqu\'un qui a quitté le salon', () => {
     expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice', 'ancien'], unanimite(2))).toBe(true)
     expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'ancien'], unanimite(2))).toBe(false)
   })
