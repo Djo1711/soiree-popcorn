@@ -27,6 +27,8 @@ Le produit répond à une question précise : **« on regarde quoi ce soir ? »*
 | Sujet | Décision |
 |---|---|
 | Identification | Code de salon partagé. Aucun compte, aucun mot de passe, aucun e-mail. |
+| Taille du salon | De 2 à 8 personnes. L'effectif est annoncé à la création et le salon ne matche pas tant que tout le monde n'a pas rejoint. |
+| Seuil de match | Réglable à la création : unanimité par défaut, abaissable jusqu'à 2. |
 | Rythme | Salon permanent. Balayage asynchrone, notification de match en direct si l'application est ouverte. |
 | Catalogue | Netflix + MyCanal + Disney+ en abonnement (France), plus le top 200 all-time. |
 | Filtres | Optionnels, personnels à chaque membre, modifiables à tout moment. |
@@ -82,8 +84,12 @@ Huit tables, volontairement plates. Les listes (genres, mots-clés, plateformes)
 ```
 rooms
   code             text        PK          -- 6 caractères
+  expected_members integer     NOT NULL    -- effectif annoncé, entre 2 et 8
+  match_threshold  integer     NOT NULL    -- likes requis, entre 2 et expected_members
   created_at       timestamptz NOT NULL DEFAULT now()
   last_active_at   timestamptz NOT NULL DEFAULT now()
+  CHECK (expected_members BETWEEN 2 AND 8)
+  CHECK (match_threshold BETWEEN 2 AND expected_members)
 
 members
   id               uuid        PK DEFAULT gen_random_uuid()
@@ -222,21 +228,31 @@ VALUES (:me, :movie, true)
 ON CONFLICT DO NOTHING;
 
 INSERT INTO matches (room_code, movie_id)
-SELECT :room, :movie
-WHERE (SELECT count(*) FROM members WHERE room_code = :room) >= 2
-  AND NOT EXISTS (
-    SELECT 1 FROM members mem
-    WHERE mem.room_code = :room
-      AND NOT EXISTS (
-        SELECT 1 FROM swipes s
-        WHERE s.member_id = mem.id AND s.movie_id = :movie AND s.liked
-      )
-  )
+SELECT r.code, :movie
+FROM rooms r
+WHERE r.code = :room
+  -- tout le monde est arrivé
+  AND (SELECT count(*) FROM members WHERE room_code = r.code) = r.expected_members
+  -- le seuil de likes est atteint
+  AND (
+        SELECT count(*)
+        FROM members mem
+        JOIN swipes s ON s.member_id = mem.id AND s.movie_id = :movie AND s.liked
+        WHERE mem.room_code = r.code
+      ) >= r.match_threshold
 ON CONFLICT (room_code, movie_id) DO NOTHING
 RETURNING id;
 ```
 
-La règle est écrite pour **N membres** : le match naît quand *tous* les membres du salon ont aimé le film. Le garde-fou `count(*) >= 2` empêche un membre seul de matcher avec lui-même. Généraliser à N ne coûte rien aujourd'hui et permettra d'inviter des amis sans réécriture.
+La règle repose sur deux conditions indépendantes.
+
+**L'effectif est complet.** Le nombre de membres ayant rejoint doit égaler l'effectif annoncé à la création. Tant que quelqu'un manque, aucun match ne se crée et le salon affiche « 3 sur 6 arrivés ». Cela évite le cas pénible où deux personnes matchent sur un film pendant que les quatre autres n'ont pas encore ouvert l'application — un match doit engager tout le monde.
+
+**Le seuil est atteint.** Le nombre de membres ayant aimé le film doit atteindre `match_threshold`, dont la valeur par défaut est l'effectif complet, c'est-à-dire l'unanimité.
+
+Le seuil existe parce que l'unanimité ne passe pas à l'échelle. À deux, exiger que les deux aiment est la bonne règle et c'est le comportement par défaut. À huit, si chacun aime environ 40 % des films, l'unanimité survient dans 0,07 % des cas : le groupe balaierait le catalogue entier sans jamais rien trouver. Le seuil laisse à l'organisateur le choix entre « il faut que ça plaise à tout le monde » et « quatre sur six suffisent, on lance le film ».
+
+Le plancher de 2 pour `match_threshold` empêche qu'un seul avis suffise à décider pour le groupe. Le plafond de 8 pour `expected_members` borne la taille du salon.
 
 Si la requête renvoie une ligne, la réponse HTTP contient le film et l'interface déclenche la superposition de match immédiatement.
 
@@ -258,7 +274,7 @@ Le bouton retour supprime le dernier balayage du membre et la carte revient en t
 
 Deux actions : *Créer un salon* et *Rejoindre*.
 
-- **Créer** génère un code, demande un prénom, crée le membre, pose le cookie et affiche le lien à partager (`/j/<CODE>`) avec un bouton de copie.
+- **Créer** demande trois choses : ton prénom, le nombre de participants (de 2 à 8, réglé à 2 par défaut) et le seuil de match. Le seuil n'apparaît qu'au-delà de deux participants, puisqu'à deux il ne peut valoir que 2 ; il se règle sur un curseur allant de 2 à l'effectif, positionné par défaut sur l'unanimité et légendé en clair : « il faut que 4 personnes sur 6 aiment le film ». Le salon est alors créé, le cookie posé, et le lien à partager (`/j/<CODE>`) s'affiche avec un bouton de copie.
 - **Rejoindre** demande le code puis le prénom.
 - `/j/<CODE>` court-circuite la saisie du code.
 
@@ -277,6 +293,8 @@ L'écran principal. Pile de trois cartes visibles (échelles 1 / 0,95 / 0,90, d�
 **Contrôles sous la pile :** rembobiner, rejeter, aimer, détails. Tous les gestes sont doublés par un bouton — l'application est entièrement utilisable sans balayer.
 
 **Barre supérieure :** code du salon, compteur de matchs (qui mène à la page matchs), accès aux filtres et aux réglages.
+
+**Salle d'attente.** Tant que l'effectif annoncé n'est pas au complet, un bandeau permanent affiche « 3 sur 6 arrivés » avec le lien d'invitation à portée de main. Le balayage reste possible — les likes sont enregistrés et compteront dès que le dernier arrivant aura rejoint — mais aucun match ne se déclenche, et le bandeau le dit explicitement pour que personne ne s'étonne du silence.
 
 **Fin de paquet :** message explicite indiquant le nombre de films restants à zéro, avec un bouton pour desserrer les filtres et un rappel de ceux qui sont actifs.
 
@@ -375,8 +393,8 @@ Toutes les routes valident leur entrée et exigent un cookie de session valide, 
 
 | Route | Méthode | Rôle |
 |---|---|---|
-| `/api/rooms` | POST | Crée un salon, renvoie le code |
-| `/api/rooms/[code]/join` | POST | `{ displayName }` → crée le membre, pose le cookie |
+| `/api/rooms` | POST | `{ displayName, expectedMembers, matchThreshold }` → crée le salon, renvoie le code |
+| `/api/rooms/[code]/join` | POST | `{ displayName }` → crée le membre, pose le cookie. Refuse au-delà de `expected_members` |
 | `/api/rooms/[code]/members` | GET | Liste des prénoms (écran « qui es-tu ? ») |
 | `/api/rooms/[code]/claim` | POST | `{ memberId }` → reprend une identité existante |
 | `/api/deck` | GET | 20 cartes selon les filtres du membre |
@@ -448,6 +466,7 @@ Les quatre tags affichés ne sont pas stockés : ils se recomposent à l'afficha
 | Deux likes simultanés | `UNIQUE (room_code, movie_id)` + `ON CONFLICT DO NOTHING` : un seul match. |
 | Cookie effacé, nouveau téléphone | Écran « qui es-tu ? » listant les prénoms du salon ; l'identité est reprise avec son historique. |
 | Code de salon inexistant | Message explicite, champ conservé. |
+| Salon déjà complet | L'adhésion est refusée avec le nombre de places annoncées, et la proposition de reprendre une identité existante si c'est un retour. |
 | Filtres sans résultat | Écran dédié rappelant les filtres actifs, avec un bouton pour les desserrer. |
 | Affiche manquante | Substitut dessiné dans le thème courant, portant le titre. |
 | Tentatives de codes en série | Limite par adresse IP via `rate_limits` : 10 tentatives d'adhésion par minute. |

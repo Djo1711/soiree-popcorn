@@ -24,6 +24,7 @@
 - La collecte TMDB se fait **plateforme par plateforme**, jamais en une requête combinée : le plafond de TMDB est de 500 pages et la requête combinée en renvoie 499.
 - `.env.local` n'est **jamais** commité. Il est déjà couvert par `.gitignore`.
 - Alphabet des codes de salon : `ABCDEFGHJKLMNPQRSTUVWXYZ23456789` (32 caractères, sans `I`, `O`, `0`, `1`), longueur 6.
+- Taille d'un salon : de **2 à 8** participants, effectif annoncé à la création. Seuil de match réglable entre **2** et l'effectif, valant l'effectif par défaut (unanimité). Aucun match tant que l'effectif annoncé n'est pas au complet.
 - Formule de tri du paquet : `u × (1.30 − 0.60 × popularity_percentile)` où `u` provient des **7 premiers** caractères hexadécimaux de `md5(code_salon || ':' || id_film)` divisés par `0xFFFFFFF`. Sept et non huit : 28 bits n'activent jamais le bit de signe d'un entier Postgres.
 - Un commit par tâche, message en français, à l'impératif.
 
@@ -37,7 +38,7 @@
 | `app/layout.tsx`, `app/page.tsx`, `app/globals.css` | Coquille Next.js minimale | 1 |
 | `lib/roomcode.ts` | Génération et validation des codes de salon | 2 |
 | `lib/deck.ts` | Clé de tri pondérée du paquet | 3 |
-| `lib/match.ts` | Règle de création d'un match à N membres | 4 |
+| `lib/match.ts` | Règle de match : effectif complet et seuil de « j'aime » atteint | 4, 4b |
 | `data/keywords-fr.json` | Dictionnaire mot-clé TMDB → français | 5 |
 | `lib/keywords.ts` | Traduction des mots-clés et composition des tags | 5 |
 | `lib/db/schema.ts` | Définition Drizzle des huit tables | 6 |
@@ -618,6 +619,194 @@ git commit -m "Ajoute la règle de création de match à N membres"
 
 ---
 
+## Task 4b: Effectif du salon et seuil de match
+
+La règle de la tâche 4 exige l'unanimité des membres présents. Deux exigences s'y ajoutent : un salon compte de 2 à 8 participants dont l'effectif est annoncé à la création, aucun match ne se crée tant que tout le monde n'a pas rejoint, et le nombre de « j'aime » requis est réglable entre 2 et l'effectif.
+
+Le seuil existe parce que l'unanimité ne passe pas à l'échelle : à huit personnes aimant chacune 40 % des films, l'unanimité survient dans 0,07 % des cas.
+
+**Files:**
+- Modify: `lib/match.ts`
+- Test: `tests/unit/match.test.ts`
+
+**Interfaces:**
+- Consumes: rien
+- Produit :
+  - `MIN_MEMBERS: number` — vaut 2
+  - `MAX_MEMBERS: number` — vaut 8
+  - `MatchRule` — `{ expectedMembers: number; threshold: number }`
+  - `shouldCreateMatch(memberIds: string[], likedByMemberIds: Iterable<string>, rule: MatchRule): boolean` — **la signature change**, un troisième paramètre obligatoire apparaît
+
+- [ ] **Step 1: Réécrire le test qui échoue**
+
+Remplacer intégralement `tests/unit/match.test.ts` par :
+
+```ts
+import { describe, expect, it } from 'vitest'
+import { MAX_MEMBERS, MIN_MEMBERS, shouldCreateMatch } from '@/lib/match'
+
+/** Salon de `n` membres nommés m1…mn. */
+const salon = (n: number) => Array.from({ length: n }, (_, i) => `m${i + 1}`)
+/** Règle par défaut : unanimité sur un effectif de `n`. */
+const unanimite = (n: number) => ({ expectedMembers: n, threshold: n })
+
+describe('bornes', () => {
+  it('expose un plancher de 2 et un plafond de 8', () => {
+    expect(MIN_MEMBERS).toBe(2)
+    expect(MAX_MEMBERS).toBe(8)
+  })
+
+  it('refuse un effectif hors bornes', () => {
+    expect(shouldCreateMatch(salon(1), salon(1), unanimite(1))).toBe(false)
+    expect(shouldCreateMatch(salon(9), salon(9), unanimite(9))).toBe(false)
+  })
+
+  it('refuse un seuil inférieur à 2, pour qu’un seul avis ne décide jamais', () => {
+    expect(shouldCreateMatch(salon(4), ['m1'], { expectedMembers: 4, threshold: 1 })).toBe(false)
+  })
+
+  it('refuse un seuil supérieur à l’effectif', () => {
+    expect(shouldCreateMatch(salon(4), salon(4), { expectedMembers: 4, threshold: 5 })).toBe(false)
+  })
+})
+
+describe('effectif incomplet', () => {
+  it('ne matche pas tant que tout le monde n’a pas rejoint', () => {
+    // 5 arrivés sur 6 annoncés, tous les 5 ont aimé, seuil de 4 pourtant atteint
+    expect(shouldCreateMatch(salon(5), salon(5), { expectedMembers: 6, threshold: 4 })).toBe(false)
+  })
+
+  it('matche dès que le dernier arrivant complète l’effectif', () => {
+    expect(shouldCreateMatch(salon(6), salon(6), { expectedMembers: 6, threshold: 4 })).toBe(true)
+  })
+
+  it('ne compte pas un identifiant dupliqué comme un participant de plus', () => {
+    expect(shouldCreateMatch(['solo', 'solo'], ['solo'], unanimite(2))).toBe(false)
+  })
+})
+
+describe('seuil', () => {
+  it('matche à deux quand les deux ont aimé', () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice'], unanimite(2))).toBe(true)
+  })
+
+  it('ne matche pas à deux si un seul a aimé', () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo'], unanimite(2))).toBe(false)
+  })
+
+  it('matche quand le seuil est exactement atteint', () => {
+    const aime = ['m1', 'm2', 'm3', 'm4']
+    expect(shouldCreateMatch(salon(6), aime, { expectedMembers: 6, threshold: 4 })).toBe(true)
+  })
+
+  it('ne matche pas une voix en dessous du seuil', () => {
+    const aime = ['m1', 'm2', 'm3']
+    expect(shouldCreateMatch(salon(6), aime, { expectedMembers: 6, threshold: 4 })).toBe(false)
+  })
+
+  it('exige l’unanimité quand le seuil vaut l’effectif', () => {
+    expect(shouldCreateMatch(salon(8), salon(8), unanimite(8))).toBe(true)
+    expect(shouldCreateMatch(salon(8), salon(7), unanimite(8))).toBe(false)
+  })
+})
+
+describe('likes étrangers au salon', () => {
+  it('ignore le like de quelqu’un qui a quitté le salon', () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice', 'ancien'], unanimite(2))).toBe(true)
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'ancien'], unanimite(2))).toBe(false)
+  })
+
+  it('ne laisse pas des likes étrangers atteindre le seuil à eux seuls', () => {
+    const etrangers = ['x1', 'x2', 'x3', 'x4']
+    expect(shouldCreateMatch(salon(6), etrangers, { expectedMembers: 6, threshold: 4 })).toBe(false)
+  })
+
+  it('déduplique sans empêcher un match légitime', () => {
+    // « djo » compté une seule fois : 2 participants distincts, effectif de 2 annoncé,
+    // les deux ont aimé — le dédoublonnage ne doit pas transformer ce cas valide en refus.
+    expect(shouldCreateMatch(['djo', 'djo', 'alice'], ['djo', 'alice'], unanimite(2))).toBe(true)
+  })
+})
+```
+
+- [ ] **Step 2: Lancer le test pour vérifier qu'il échoue**
+
+```bash
+pnpm vitest run tests/unit/match.test.ts
+```
+
+Attendu : ÉCHEC — `MIN_MEMBERS`/`MAX_MEMBERS` n'existent pas et `shouldCreateMatch` n'accepte que deux arguments.
+
+- [ ] **Step 3: Réécrire l'implémentation**
+
+Remplacer intégralement `lib/match.ts` par :
+
+```ts
+export const MIN_MEMBERS = 2
+export const MAX_MEMBERS = 8
+
+export interface MatchRule {
+  /** Effectif annoncé à la création du salon, entre MIN_MEMBERS et MAX_MEMBERS. */
+  expectedMembers: number
+  /** Nombre de « j'aime » requis, entre MIN_MEMBERS et expectedMembers. */
+  threshold: number
+}
+
+/**
+ * Un match naît quand deux conditions sont réunies : l'effectif annoncé est au
+ * complet, et le nombre de membres ayant aimé le film atteint le seuil.
+ *
+ * Les identifiants sont dédoublonnés avant d'être comptés, pour qu'un doublon
+ * ne puisse pas faire passer une personne pour deux participants.
+ *
+ * Le seuil existe parce que l'unanimité ne passe pas à l'échelle : à huit
+ * personnes aimant chacune 40 % des films, elle survient dans 0,07 % des cas.
+ * Son plancher de 2 empêche qu'un seul avis décide pour le groupe.
+ */
+export function shouldCreateMatch(
+  memberIds: string[],
+  likedByMemberIds: Iterable<string>,
+  rule: MatchRule,
+): boolean {
+  const { expectedMembers, threshold } = rule
+
+  if (!Number.isInteger(expectedMembers) || !Number.isInteger(threshold)) return false
+  if (expectedMembers < MIN_MEMBERS || expectedMembers > MAX_MEMBERS) return false
+  if (threshold < MIN_MEMBERS || threshold > expectedMembers) return false
+
+  const membresDistincts = new Set(memberIds)
+  if (membresDistincts.size !== expectedMembers) return false
+
+  const liked = new Set(likedByMemberIds)
+  let votes = 0
+  for (const id of membresDistincts) {
+    if (liked.has(id)) votes++
+  }
+  return votes >= threshold
+}
+```
+
+- [ ] **Step 4: Lancer le test pour vérifier qu'il passe**
+
+```bash
+pnpm vitest run tests/unit/match.test.ts
+```
+
+Attendu : `15 passed`.
+
+- [ ] **Step 5: Vérifier que le seuil discrimine réellement**
+
+Remplacer temporairement la dernière ligne par `return votes >= 1`, relancer le fichier, et constater que les tests de seuil échouent. Restaurer, relancer, constater `15 passed`. Ne pas commiter la version cassée.
+
+- [ ] **Step 6: Commit**
+
+```bash
+git add lib/match.ts tests/unit/match.test.ts
+git commit -m "Ajoute l'effectif du salon et le seuil de match réglable"
+```
+
+---
+
 ## Task 5: Dictionnaire de mots-clés et composition des tags
 
 Le dictionnaire livré ici est une amorce d'environ 90 entrées choisies parmi les mots-clés TMDB les plus courants. La tâche 10 l'enrichira à partir des fréquences réelles du catalogue, une fois celui-ci ingéré.
@@ -905,6 +1094,7 @@ import { sql } from 'drizzle-orm'
 import {
   bigserial,
   boolean,
+  check,
   date,
   doublePrecision,
   index,
@@ -919,11 +1109,22 @@ import {
   uuid,
 } from 'drizzle-orm/pg-core'
 
-export const rooms = pgTable('rooms', {
-  code: text('code').primaryKey(),
-  createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
-  lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
-})
+export const rooms = pgTable(
+  'rooms',
+  {
+    code: text('code').primaryKey(),
+    /** Effectif annoncé à la création : aucun match tant qu'il n'est pas atteint. */
+    expectedMembers: integer('expected_members').notNull(),
+    /** Nombre de « j'aime » requis, entre 2 et expectedMembers. */
+    matchThreshold: integer('match_threshold').notNull(),
+    createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
+    lastActiveAt: timestamp('last_active_at', { withTimezone: true }).notNull().defaultNow(),
+  },
+  (t) => [
+    check('rooms_expected_members_range', sql`${t.expectedMembers} BETWEEN 2 AND 8`),
+    check('rooms_threshold_range', sql`${t.matchThreshold} BETWEEN 2 AND ${t.expectedMembers}`),
+  ],
+)
 
 export const members = pgTable(
   'members',
@@ -1188,7 +1389,7 @@ describe('schéma', () => {
   })
 
   it('interdit deux balayages du même membre sur le même film', async () => {
-    await db.insert(rooms).values({ code: 'K4P2M9' })
+    await db.insert(rooms).values({ code: 'K4P2M9', expectedMembers: 2, matchThreshold: 2 })
     const [member] = await db
       .insert(members)
       .values({ roomCode: 'K4P2M9', displayName: 'Djo' })
@@ -1206,7 +1407,7 @@ describe('schéma', () => {
   })
 
   it('interdit deux matchs sur le même film dans le même salon', async () => {
-    await db.insert(rooms).values({ code: 'K4P2M9' })
+    await db.insert(rooms).values({ code: 'K4P2M9', expectedMembers: 2, matchThreshold: 2 })
     await seedMovies(1)
 
     await db.insert(matches).values({ roomCode: 'K4P2M9', movieId: 1 })
@@ -1220,7 +1421,7 @@ describe('schéma', () => {
   })
 
   it('supprime les membres et les balayages avec le salon', async () => {
-    await db.insert(rooms).values({ code: 'K4P2M9' })
+    await db.insert(rooms).values({ code: 'K4P2M9', expectedMembers: 2, matchThreshold: 2 })
     const [member] = await db
       .insert(members)
       .values({ roomCode: 'K4P2M9', displayName: 'Djo' })
@@ -1232,6 +1433,24 @@ describe('schéma', () => {
 
     expect(await db.select().from(members)).toHaveLength(0)
     expect(await db.select().from(swipes)).toHaveLength(0)
+  })
+
+  it('refuse un effectif hors des bornes 2 à 8', async () => {
+    await expect(
+      db.insert(rooms).values({ code: 'TROP01', expectedMembers: 9, matchThreshold: 2 }),
+    ).rejects.toThrow()
+    await expect(
+      db.insert(rooms).values({ code: 'PEU001', expectedMembers: 1, matchThreshold: 2 }),
+    ).rejects.toThrow()
+  })
+
+  it('refuse un seuil hors des bornes 2 à effectif', async () => {
+    await expect(
+      db.insert(rooms).values({ code: 'SEUI01', expectedMembers: 4, matchThreshold: 5 }),
+    ).rejects.toThrow()
+    await expect(
+      db.insert(rooms).values({ code: 'SEUI02', expectedMembers: 4, matchThreshold: 1 }),
+    ).rejects.toThrow()
   })
 })
 
