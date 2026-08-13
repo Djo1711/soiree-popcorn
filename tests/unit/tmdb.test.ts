@@ -49,19 +49,22 @@ describe('TmdbClient', () => {
     expect(fetchImpl).toHaveBeenCalledTimes(1)
   })
 
-  it('applique un repli exponentiel de 500 ms puis 1 s', async () => {
+  it('applique un repli exponentiel de 500 ms, 1 s puis 2 s', async () => {
     const delais: number[] = []
     const fetchImpl = vi
       .fn()
       .mockResolvedValueOnce(fakeResponse({}, 500))
       .mockResolvedValueOnce(fakeResponse({}, 503))
+      .mockResolvedValueOnce(fakeResponse({}, 502))
       .mockResolvedValueOnce(fakeResponse({ results: [] }))
 
     await client(fetchImpl as unknown as typeof fetch, async (ms) => {
       delais.push(ms)
     }).listProviders()
 
-    expect(delais).toEqual([500, 1000])
+    // Trois points sont nécessaires : un repli linéaire donnerait [500, 1000, 1500]
+    // et passerait un test qui s'arrête à deux valeurs.
+    expect(delais).toEqual([500, 1000, 2000])
   })
 
   it('convertit retry-after de secondes en millisecondes', async () => {
