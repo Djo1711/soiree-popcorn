@@ -531,42 +531,42 @@ git commit -m "Ajoute la clé de tri pondérée du paquet"
 `tests/unit/match.test.ts` :
 
 ```ts
-import { describe, expect, it } from ‘vitest’
-import { shouldCreateMatch } from ‘@/lib/match’
+import { describe, expect, it } from 'vitest'
+import { shouldCreateMatch } from '@/lib/match'
 
-describe(‘shouldCreateMatch’, () => {
-  it(‘crée un match quand les deux membres ont aimé’, () => {
-    expect(shouldCreateMatch([‘djo’, ‘alice’], [‘djo’, ‘alice’])).toBe(true)
+describe('shouldCreateMatch', () => {
+  it('crée un match quand les deux membres ont aimé', () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice'])).toBe(true)
   })
 
-  it(‘ne crée pas de match si un membre manque’, () => {
-    expect(shouldCreateMatch([‘djo’, ‘alice’], [‘djo’])).toBe(false)
+  it('ne crée pas de match si un membre manque', () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo'])).toBe(false)
   })
 
-  it(`ne crée jamais de match dans un salon d’une seule personne`, () => {
-    expect(shouldCreateMatch([‘djo’], [‘djo’])).toBe(false)
+  it(`ne crée jamais de match dans un salon d'une seule personne`, () => {
+    expect(shouldCreateMatch(['djo'], ['djo'])).toBe(false)
   })
 
-  it(‘ne se laisse pas duper par un identifiant en double’, () => {
-    expect(shouldCreateMatch([‘solo’, ‘solo’], [‘solo’])).toBe(false)
+  it('ne se laisse pas duper par un identifiant en double', () => {
+    expect(shouldCreateMatch(['solo', 'solo'], ['solo'])).toBe(false)
   })
 
-  it(‘déduplique sans empêcher un match légitime’, () => {
-    expect(shouldCreateMatch([‘djo’, ‘djo’, ‘alice’], [‘djo’, ‘alice’])).toBe(true)
+  it('déduplique sans empêcher un match légitime', () => {
+    expect(shouldCreateMatch(['djo', 'djo', 'alice'], ['djo', 'alice'])).toBe(true)
   })
 
-  it(‘ne crée jamais de match dans un salon vide’, () => {
+  it('ne crée jamais de match dans un salon vide', () => {
     expect(shouldCreateMatch([], [])).toBe(false)
   })
 
-  it(‘exige que les trois membres aient aimé’, () => {
-    expect(shouldCreateMatch([‘a’, ‘b’, ‘c’], [‘a’, ‘b’, ‘c’])).toBe(true)
-    expect(shouldCreateMatch([‘a’, ‘b’, ‘c’], [‘a’, ‘b’])).toBe(false)
+  it('exige que les trois membres aient aimé', () => {
+    expect(shouldCreateMatch(['a', 'b', 'c'], ['a', 'b', 'c'])).toBe(true)
+    expect(shouldCreateMatch(['a', 'b', 'c'], ['a', 'b'])).toBe(false)
   })
 
-  it(`ignore un like venant de quelqu’un qui a quitté le salon`, () => {
-    expect(shouldCreateMatch([‘djo’, ‘alice’], [‘djo’, ‘alice’, ‘ancien’])).toBe(true)
-    expect(shouldCreateMatch([‘djo’, ‘alice’], [‘djo’, ‘ancien’])).toBe(false)
+  it(`ignore un like venant de quelqu'un qui a quitté le salon`, () => {
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'alice', 'ancien'])).toBe(true)
+    expect(shouldCreateMatch(['djo', 'alice'], ['djo', 'ancien'])).toBe(false)
   })
 })
 ```
@@ -589,7 +589,9 @@ Attendu : ÉCHEC — `Failed to resolve import "@/lib/match"`.
  *
  * Écrit pour N membres plutôt que pour 2 : cela ne coûte rien aujourd'hui et
  * permettra d'inviter des amis sans réécriture. Le garde-fou sur la taille du
- * salon empêche une personne seule de matcher avec elle-même.
+ * salon empêche une personne seule de matcher avec elle-même. Les identifiants
+ * sont dédupliqués avant le comptage, de sorte qu'un identifiant dupliqué ne
+ * peut pas feindre l'adhésion d'un deuxième participant.
  */
 export function shouldCreateMatch(
   memberIds: string[],
