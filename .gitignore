@@ -23,3 +23,6 @@ build/
 coverage/
 playwright-report/
 test-results/
+
+# artefacts TypeScript
+*.tsbuildinfo
