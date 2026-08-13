@@ -1505,7 +1505,17 @@ describe('ordre du paquet', () => {
 pnpm vitest run tests/integration/schema.test.ts
 ```
 
-Attendu : ÉCHEC — le module `@/lib/db/schema` ou le dossier `drizzle` est introuvable tant que l'étape 3 n'a pas été faite. Si l'étape 3 est faite, ce test doit déjà passer : dans ce cas, vérifier qu'il échoue en changeant temporairement `1, 7` en `1, 8` dans la requête SQL du test d'ordre — il doit alors échouer, ce qui prouve que le test détecte bien une divergence. Remettre `1, 7` ensuite.
+Attendu : ÉCHEC — le module `@/lib/db/schema` ou le dossier `drizzle` est introuvable tant que l'étape 3 n'a pas été faite.
+
+Si l'étape 3 est déjà faite, le test passe et il faut alors prouver qu'il n'est pas complaisant. **Ne pas utiliser `1, 7` → `1, 8` pour cela : cette mutation ne change rien.** Un littéral hexadécimal de 8 caractères vaut 32 bits, et la conversion en `bit(28)` tronque les 4 bits de droite — on retrouve exactement les 7 premiers caractères. Les deux écritures sont mathématiquement identiques et le test passerait dans les deux cas.
+
+La mutation qui discrimine porte sur la formule elle-même. Remplacer temporairement `1.30` par `1.35` dans la requête SQL du test d'ordre, en laissant `lib/deck.ts` à `1.30` :
+
+```bash
+pnpm vitest run tests/integration/schema.test.ts
+```
+
+Attendu : ÉCHEC, avec un ordre de lignes différent entre SQL et TypeScript. C'est la preuve que le test compare réellement les deux implémentations. Restaurer `1.30` et relancer avant de continuer.
 
 - [ ] **Step 7: Lancer tous les tests**
 
@@ -1513,7 +1523,7 @@ Attendu : ÉCHEC — le module `@/lib/db/schema` ou le dossier `drizzle` est int
 pnpm test
 ```
 
-Attendu : tous les tests passent, dont les 6 du fichier d'intégration.
+Attendu : tous les tests passent, dont les 8 du fichier d'intégration.
 
 - [ ] **Step 8: Commit**
 
