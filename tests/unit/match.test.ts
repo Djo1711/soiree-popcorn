@@ -18,6 +18,10 @@ describe('shouldCreateMatch', () => {
     expect(shouldCreateMatch(['solo', 'solo'], ['solo'])).toBe(false)
   })
 
+  it('déduplique sans empêcher un match légitime', () => {
+    expect(shouldCreateMatch(['djo', 'djo', 'alice'], ['djo', 'alice'])).toBe(true)
+  })
+
   it('ne crée jamais de match dans un salon vide', () => {
     expect(shouldCreateMatch([], [])).toBe(false)
   })
