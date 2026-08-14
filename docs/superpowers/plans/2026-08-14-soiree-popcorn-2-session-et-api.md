@@ -192,28 +192,50 @@ Corriger `scripts/migrate.ts`, `scripts/ingest.ts` et `scripts/build-keywords.ts
 `tests/integration/client.test.ts` :
 
 ```ts
-import { afterEach, describe, expect, it } from 'vitest'
-import { closePool, getDb } from '@/lib/db/client'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 
 const original = process.env.DATABASE_URL
 
 afterEach(async () => {
-  process.env.DATABASE_URL = original
+  if (original === undefined) delete process.env.DATABASE_URL
+  else process.env.DATABASE_URL = original
+
+  const { closePool } = await import('@/lib/db/client')
   await closePool()
 })
 
 describe('getDb', () => {
   it('ne lève pas au simple import du module', async () => {
     delete process.env.DATABASE_URL
+    vi.resetModules()
     await expect(import('@/lib/db/client')).resolves.toBeDefined()
   })
 
-  it('lève un message actionnable quand DATABASE_URL manque', () => {
+  it('lève un message actionnable quand DATABASE_URL manque', async () => {
     delete process.env.DATABASE_URL
+    vi.resetModules()
+    const { getDb } = await import('@/lib/db/client')
     expect(() => getDb()).toThrow(/DATABASE_URL est absent/)
+  })
+
+  // Ce test s'exécute après les deux précédents et vérifie donc l'état que
+  // leurs `afterEach` respectifs ont laissé : sous `pnpm test`, `original` vaut
+  // `undefined`, donc un `afterEach` fautif (`process.env.DATABASE_URL =
+  // original`) écrirait la chaîne "undefined" — truthy, non vide — au lieu de
+  // supprimer la variable. Comparer à `original` plutôt que tester une simple
+  // "vérité" est ce qui rend l'assertion capable de détecter cette régression.
+  it('laisse DATABASE_URL réellement absent après nettoyage, et non à la chaîne « undefined »', () => {
+    expect(process.env.DATABASE_URL).toBe(original)
   })
 })
 ```
+
+Il n'y a plus d'import statique de `@/lib/db/client` en tête de fichier :
+avec un tel import, le cache des modules de Node renvoie l'instance déjà
+chargée à chaque `import(...)` dynamique, si bien que le test « ne lève pas au
+simple import » ne charge jamais réellement un module frais et ne peut donc
+rien prouver. `vi.resetModules()` avant chaque import dynamique force un
+chargement neuf, seul capable de révéler un throw au niveau module.
 
 - [ ] **Step 6: Vérifier**
 
@@ -223,7 +245,7 @@ pnpm exec tsc --noEmit
 pnpm build
 ```
 
-Attendu : suite verte, compilation propre, et `pnpm build` réussit — c'est cette dernière commande qui prouve la correction de la dette n°1.
+Attendu : suite verte, compilation propre. `pnpm build` sert ici de vérification de non-régression ; il ne devient une preuve réelle de la dette n°1 que lorsque les routes de la Task 8 importeront effectivement `lib/db/client.ts` — avant cela, `next build` ne charge jamais ce module et aurait tout aussi bien réussi avec l'ancien code qui levait à l'import. La preuve véritable, dès aujourd'hui, est le test d'import à froid de `tests/integration/client.test.ts` (« ne lève pas au simple import du module »), qui charge réellement le module via `vi.resetModules()`.
 
 - [ ] **Step 7: Commit**
 
