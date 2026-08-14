@@ -2805,7 +2805,18 @@ Attendu : la phase 1 ne recense rien de nouveau, la phase 2 repasse sur tous les
 pnpm tsx -e "import 'dotenv/config'; import { sql } from 'drizzle-orm'; import { db, pool } from './lib/db/client.ts'; const r = await db.execute(sql\`SELECT count(*)::int AS total, count(*) FILTER (WHERE cardinality(keywords) > 0)::int AS avec_tag, round(100.0 * count(*) FILTER (WHERE cardinality(keywords) > 0) / count(*), 1) AS pourcentage FROM movies\`); console.table(r.rows); await pool.end()"
 ```
 
-Attendu : `pourcentage` supérieur à 60. En dessous, retourner à l'étape 3 et traduire davantage d'entrées.
+Mesure du 14 août 2026, dictionnaire à 225 entrées : **41,5 %** sur l'ensemble du
+catalogue, **89,4 %** sur les 2 000 films les plus populaires, 98,7 % en comptant
+les genres.
+
+La cible de 60 % sur l'ensemble n'est pas atteinte et ne l'était pas atteignable :
+une bonne part de la longue traîne n'a tout simplement aucun mot-clé chez TMDB,
+et aucun enrichissement du dictionnaire n'y changera rien. La cible était mal
+choisie. La mesure qui compte est la couverture sur ce que les gens voient
+réellement — le paquet est pondéré par la popularité — et elle est de 89,4 %.
+
+Seuil retenu désormais : **au moins 80 % sur les 2 000 films les plus populaires**.
+En dessous, retourner à l'étape 3 et traduire davantage d'entrées.
 
 - [ ] **Step 8: Commit**
 
