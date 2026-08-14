@@ -215,6 +215,24 @@ describe('fetchDetails avec un faux client', () => {
     expect(row.detailFetchedAt).not.toBeNull()
   })
 
+  it("remplace les plateformes par la liste FR courante, y compris quand un film en a quitté une", async () => {
+    // La phase 1 avait recensé ce film sur Disney+ et Netflix ; TMDB ne le
+    // donne plus que sur Netflix. La phase 2 fait autorité et doit rétrécir la
+    // liste, sinon un filtre « sur Disney+ » se remplirait de films partis.
+    await db.insert(movies).values({ id: 598, title: 'Stub', providers: ['disney', 'netflix'] })
+
+    const client: ClientDetail = {
+      async movieDetail() {
+        return detail
+      },
+    }
+
+    await fetchDetails(client, db, () => {})
+
+    const [row] = await db.select().from(movies)
+    expect(row.providers).toEqual(['netflix'])
+  })
+
   it("un TmdbHttpError 404 sur un film le marque traité et laisse les autres se terminer", async () => {
     await db.insert(movies).values([
       { id: 1, title: 'Disparu' },

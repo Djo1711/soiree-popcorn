@@ -51,4 +51,6 @@ async function main() {
   await pool.end()
 }
 
-void main()
+// `await` et non `void` : une promesse rejetée doit faire échouer le script avec
+// son code d'erreur, pas se perdre en avertissement de rejet non géré.
+await main()

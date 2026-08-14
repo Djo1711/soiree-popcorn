@@ -46,9 +46,18 @@ describe('isValidRoomCode', () => {
     expect(isValidRoomCode('K4P2M99')).toBe(false)
   })
 
+  it('refuse une saisie vide', () => {
+    expect(isValidRoomCode('')).toBe(false)
+    expect(isValidRoomCode('   ')).toBe(false)
+  })
+
   it('refuse les caractères ambigus et hors alphabet', () => {
     expect(isValidRoomCode('K4P2MO')).toBe(false)
     expect(isValidRoomCode('K4P2M1')).toBe(false)
     expect(isValidRoomCode('K4P2M!')).toBe(false)
+  })
+
+  it("refuse un code de la bonne longueur entièrement fait de caractères exclus", () => {
+    expect(isValidRoomCode('IIOO01')).toBe(false)
   })
 })

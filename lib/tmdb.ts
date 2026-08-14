@@ -119,9 +119,12 @@ export class TmdbClient {
         })
       } catch (erreur) {
         // Coupure réseau ou délai dépassé : réessayable, contrairement à un refus du serveur.
+        // L'erreur levée est volontairement un `Error` nu et non un `TmdbHttpError` :
+        // c'est ce qui fait que `fetchDetails` la traite comme passagère et laisse
+        // la ligne à retenter, au lieu de la marquer définitivement traitée.
         if (attempt === MAX_ATTEMPTS) {
           throw new Error(
-            `TMDB injoignable sur ${path} après ${MAX_ATTEMPTS} tentatives : ${(erreur as Error).message}`,
+            `TMDB injoignable sur ${path} après ${MAX_ATTEMPTS} tentatives : ${String(erreur)}`,
           )
         }
         await this.sleepImpl(backoffMs(attempt))

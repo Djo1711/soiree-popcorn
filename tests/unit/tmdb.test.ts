@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { TmdbClient } from '@/lib/tmdb'
+import { TmdbClient, TmdbHttpError } from '@/lib/tmdb'
 
 function fakeResponse(body: unknown, status = 200, headers: Record<string, string> = {}) {
   return new Response(JSON.stringify(body), { status, headers })
@@ -107,6 +107,24 @@ describe('TmdbClient', () => {
 
     expect(fetchImpl).toHaveBeenCalledTimes(2)
     expect(providers).toEqual([{ provider_id: 8, provider_name: 'Netflix' }])
+  })
+
+  it('abandonne après six coupures réseau en levant une erreur nue et non un TmdbHttpError', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new Error('socket hang up')
+    })
+
+    const erreur = await client(fetchImpl as unknown as typeof fetch)
+      .movieDetail(1)
+      .catch((e: unknown) => e)
+
+    expect(fetchImpl).toHaveBeenCalledTimes(6)
+    expect(erreur).toBeInstanceOf(Error)
+    // La distinction porte tout le comportement de reprise de `fetchDetails` :
+    // un `TmdbHttpError` peut être définitif (404), une panne réseau ne l'est
+    // jamais et la ligne doit rester à retenter.
+    expect(erreur).not.toBeInstanceOf(TmdbHttpError)
+    expect((erreur as Error).message).toMatch(/injoignable.*6 tentatives.*socket hang up/)
   })
 })
 

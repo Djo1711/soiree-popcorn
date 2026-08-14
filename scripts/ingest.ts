@@ -1,7 +1,8 @@
-import { sql } from 'drizzle-orm'
+import { sql, type Assume } from 'drizzle-orm'
 import { translateKeywords } from '@/lib/keywords'
 import type { ProviderKey } from '@/lib/db/schema'
 import {
+  PROVIDER_MATCHERS,
   TmdbClient,
   TmdbHttpError,
   type ClientCollecte,
@@ -9,8 +10,19 @@ import {
   type TmdbMovieDetail,
 } from '@/lib/tmdb'
 
-/** Toute base Postgres pilotée par Drizzle : Neon en production, PGlite en test. */
-type AnyDb = { execute: (query: ReturnType<typeof sql>) => Promise<unknown> }
+/**
+ * Toute base Postgres pilotée par Drizzle : Neon en production, PGlite en test.
+ *
+ * Le `Assume` reprend mot pour mot la forme des deux pilotes ; sans lui, leurs
+ * signatures ne s'unifient pas et il faut recaster chaque résultat. Sur un appel
+ * concret il se réduit à `T`, donc `execute<{ id: number }>` rend bien
+ * `{ rows: { id: number }[] }`.
+ */
+type AnyDb = {
+  execute: <T extends Record<string, any>>(
+    query: ReturnType<typeof sql>,
+  ) => Promise<{ rows: Assume<T, Record<string, any>>[] }>
+}
 
 const TOP_RATED_PAGES = 10
 const DETAIL_CONCURRENCY = 8
@@ -24,12 +36,13 @@ export function mapDetailToRow(detail: TmdbMovieDetail) {
   const director = detail.credits?.crew.find((c) => c.job === 'Director')?.name ?? null
   const flatrate = detail['watch/providers']?.results?.FR?.flatrate ?? []
 
-  const providers: ProviderKey[] = []
-  for (const p of flatrate) {
-    if (/^netflix/i.test(p.provider_name) && !providers.includes('netflix')) providers.push('netflix')
-    if (/^disney plus$/i.test(p.provider_name) && !providers.includes('disney')) providers.push('disney')
-    if (/^canal\+/i.test(p.provider_name) && !providers.includes('canal')) providers.push('canal')
-  }
+  // Les motifs viennent de `PROVIDER_MATCHERS` et ne sont jamais recopiés ici :
+  // depuis que la phase 2 fait autorité sur `providers`, une divergence entre
+  // les deux listes ne se contenterait pas d'oublier une plateforme, elle
+  // l'effacerait de tous les films à la première réingestion.
+  const providers: ProviderKey[] = PROVIDER_MATCHERS.filter(({ test }) =>
+    flatrate.some((p) => test(p.provider_name)),
+  ).map(({ key }) => key)
 
   return {
     id: detail.id,
@@ -126,6 +139,13 @@ async function upsertStub(
 /**
  * Phase 2 — complète les films dont le détail manque.
  *
+ * Elle fait autorité sur `providers` : la phase 1 ne sait qu'ajouter des
+ * plateformes (une union monotone, film par film et plateforme par plateforme),
+ * alors que le détail TMDB porte la liste FR complète du moment. L'écrire telle
+ * quelle est ce qui permet à un film de *quitter* une plateforme, et récupère
+ * au passage les films du top 200 que le plafond de 500 pages de `/discover`
+ * avait laissés sans aucune plateforme.
+ *
  * Seul un 404 (absence définitive côté TMDB) marque `detail_fetched_at` en
  * échec : toute autre erreur — jeton révoqué, page anti-bot, coupure réseau
  * épuisant ses tentatives — laisse la ligne intacte pour qu'une relance la
@@ -143,9 +163,9 @@ export async function fetchDetails(
   let derniereErreur = ''
 
   for (;;) {
-    const result = (await db.execute(sql`
+    const result = await db.execute<{ id: number }>(sql`
       SELECT id FROM movies WHERE detail_fetched_at IS NULL LIMIT ${DETAIL_BATCH}
-    `)) as { rows: { id: number }[] }
+    `)
     const ids = result.rows.map((r) => Number(r.id))
     if (ids.length === 0) break
 
@@ -170,8 +190,9 @@ export async function fetchDetails(
                 vote_average = ${row.voteAverage},
                 vote_count = ${row.voteCount},
                 popularity = ${row.popularity},
-                genres = ${sql.raw(pgArray(row.genres))},
-                keywords = ${sql.raw(pgArray(row.keywords))},
+                genres = ${sql.param(row.genres)}::text[],
+                keywords = ${sql.param(row.keywords)}::text[],
+                providers = ${sql.param(row.providers)}::text[],
                 director = ${row.director},
                 detail_fetched_at = now(),
                 updated_at = now()
@@ -217,12 +238,6 @@ export async function fetchDetails(
   return complets
 }
 
-function pgArray(values: string[]): string {
-  if (values.length === 0) return `'{}'::text[]`
-  const echappees = values.map((v) => `'${v.replace(/'/g, "''")}'`).join(',')
-  return `ARRAY[${echappees}]::text[]`
-}
-
 /** Phase 3 — rang de popularité relatif, entre 0 et 1. */
 export async function computePercentiles(db: AnyDb): Promise<void> {
   await db.execute(sql`
@@ -242,15 +257,18 @@ async function main() {
   const log = (message: string) => console.log(`[${new Date().toISOString()}] ${message}`)
 
   const debut = Date.now()
-  await collectCatalogue(client, db, log)
-  await fetchDetails(client, db, log)
-  await computePercentiles(db)
+  try {
+    await collectCatalogue(client, db, log)
+    await fetchDetails(client, db, log)
+    await computePercentiles(db)
 
-  const total = (await db.execute(sql`SELECT count(*)::int AS n FROM movies`)) as {
-    rows: { n: number }[]
+    const total = await db.execute<{ n: number }>(sql`SELECT count(*)::int AS n FROM movies`)
+    log(`Terminé : ${total.rows[0].n} films en base en ${Math.round((Date.now() - debut) / 1000)} s.`)
+  } finally {
+    // Sans ce `finally`, une ingestion interrompue laisse le pool ouvert et le
+    // processus pend au lieu de rendre la main avec son code d'erreur.
+    await pool.end()
   }
-  log(`Terminé : ${total.rows[0].n} films en base en ${Math.round((Date.now() - debut) / 1000)} s.`)
-  await pool.end()
 }
 
 if (process.argv[1]?.endsWith('ingest.ts')) {

@@ -79,7 +79,7 @@ Les fonctions pures (`deck`, `match`, `roomcode`, `keywords`) concentrent la log
 
 ## 4. Modèle de données
 
-Huit tables, volontairement plates. Les listes (genres, mots-clés, plateformes) sont des tableaux Postgres indexés en GIN plutôt que des tables de jointure : le filtrage reste une seule requête et le modèle reste lisible.
+Sept tables, volontairement plates. Les listes (genres, mots-clés, plateformes) sont des tableaux Postgres indexés en GIN plutôt que des tables de jointure : le filtrage reste une seule requête et le modèle reste lisible.
 
 ```
 rooms
@@ -90,6 +90,7 @@ rooms
   last_active_at   timestamptz NOT NULL DEFAULT now()
   CHECK (expected_members BETWEEN 2 AND 8)
   CHECK (match_threshold BETWEEN 2 AND expected_members)
+  CHECK (code ~ '^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$')   -- alphabet de ROOM_CODE_ALPHABET
 
 members
   id               uuid        PK DEFAULT gen_random_uuid()
@@ -121,7 +122,8 @@ movies
   detail_fetched_at      timestamptz                           -- suivi de l'ingestion, NULL = détail à récupérer
   updated_at             timestamptz NOT NULL DEFAULT now()
   INDEX GIN (genres), GIN (keywords), GIN (providers)
-  INDEX (release_year), (vote_average), (in_top200)
+  INDEX (release_year), (vote_average), (detail_fetched_at)
+  INDEX (id) WHERE in_top200        -- partiel : 200 lignes sur 10 000 seulement
 
 member_filters
   member_id        uuid        PK REFERENCES members(id) ON DELETE CASCADE
@@ -151,11 +153,7 @@ matches
   updated_at       timestamptz NOT NULL DEFAULT now()
   UNIQUE (room_code, movie_id)
   INDEX (room_code, id)
-
-ingest_state
-  key              text        PK
-  value            jsonb       NOT NULL
-  updated_at       timestamptz NOT NULL DEFAULT now()
+  CHECK (status IN ('a_voir', 'vu', 'abandonne'))
 
 rate_limits
   key              text        PK          -- 'join:<ip>'
@@ -192,27 +190,30 @@ Trois propriétés importantes en découlent :
 ### Requête du paquet
 
 ```sql
-SELECT m.*
-FROM movies m
-WHERE (cardinality(:genres) = 0 OR m.genres && :genres)
-  AND (:year_from   IS NULL OR m.release_year >= :year_from)
-  AND (:year_to     IS NULL OR m.release_year <= :year_to)
-  AND (:max_runtime IS NULL OR m.runtime <= :max_runtime)
-  AND COALESCE(m.vote_average, 0) >= :min_rating
+SELECT movies.*
+FROM movies
+WHERE (cardinality(:genres) = 0 OR movies.genres && :genres)
+  AND (:year_from   IS NULL OR movies.release_year >= :year_from)
+  AND (:year_to     IS NULL OR movies.release_year <= :year_to)
+  AND (:max_runtime IS NULL OR movies.runtime <= :max_runtime)
+  AND COALESCE(movies.vote_average, 0) >= :min_rating
   AND (
         cardinality(:providers) = 0
-        OR m.providers && :providers
-        OR (:include_top200 AND m.in_top200)
+        OR movies.providers && :providers
+        OR (:include_top200 AND movies.in_top200)
       )
   AND NOT EXISTS (
         SELECT 1 FROM swipes s
-        WHERE s.member_id = :me AND s.movie_id = m.id
+        WHERE s.member_id = :me AND s.movie_id = movies.id
       )
-ORDER BY (('x' || substr(md5(:room || ':' || m.id::text), 1, 7))::bit(28)::int::double precision
+ORDER BY (('x' || substr(md5(:room || ':' || movies.id::text), 1, 7))::bit(28)::int::double precision
           / 268435455.0)
-         * (1.30 - 0.60 * m.popularity_percentile)
+         * (1.30 - 0.60 * movies.popularity_percentile),
+         movies.id
 LIMIT 20;
 ```
+
+**Le fragment `ORDER BY` ci-dessus ne se retape jamais : il provient de `deckOrderBy` dans `lib/deck-sql.ts`, qui le construit à partir des constantes de `lib/deck.ts`.** La requête de production et le test d'intégration importent tous deux cette fonction ; c'est pour cela que la requête n'utilise pas d'alias de table et écrit `movies.` en toutes lettres. Le départage final sur `movies.id` fait partie du tri et n'est pas décoratif : 28 bits de hachage laissent des égalités possibles sur dix mille films, et deux membres d'un même salon doivent en sortir la même suite.
 
 Le client précharge 20 cartes et recharge dès qu'il en reste 5. Les affiches des 3 cartes suivantes sont préchargées par le navigateur.
 
@@ -439,13 +440,13 @@ Script `scripts/ingest.ts`, exécuté une fois à la main puis chaque semaine pa
 4. **Détail.** Pour chaque identifiant unique, `/movie/{id}?language=fr-FR&append_to_response=keywords,credits,watch/providers` → synopsis français, durée, genres français, mots-clés bruts, réalisateur (`credits.crew`, `job = Director`), plateformes.
 5. **Tags.** Les mots-clés bruts passent par `data/keywords-fr.json` ; ceux qui n'y figurent pas sont ignorés plutôt qu'affichés en anglais. Quatre tags au maximum sont retenus, mots-clés d'abord, genres ensuite.
 6. **Popularité.** `popularity_percentile` est calculé comme le rang de popularité rapporté à l'effectif total, une fois la collecte terminée.
-7. **Écriture.** Upsert par identifiant. Un film qui disparaît d'une plateforme voit son tableau `providers` mis à jour ; il reste en base s'il appartient au top 200.
+7. **Écriture.** Upsert par identifiant. Un film qui disparaît d'une plateforme voit son tableau `providers` mis à jour ; il reste en base s'il appartient au top 200. C'est la phase 2 qui fait autorité sur `providers` : elle écrit la liste FR complète lue sur le détail du film, là où la phase 1 ne sait qu'ajouter des plateformes une par une. Sans cette écriture, l'union ne ferait que grossir au fil des passages hebdomadaires et un filtre « sur Netflix » se remplirait de films partis.
 
 L'ingestion se déroule en trois phases dont la progression est portée par la base et non par un fichier d'état : la phase 1 pose une ligne minimale par film recensé, la phase 2 complète tous les films dont `detail_fetched_at` est nul, la phase 3 calcule les percentiles de popularité. Interrompue à n'importe quel moment, elle reprend exactement où elle s'était arrêtée.
 
 Les quatre tags affichés ne sont pas stockés : ils se recomposent à l'affichage à partir de `keywords` et `genres`. Stocker un dérivé de deux colonnes déjà présentes obligerait à le régénérer à chaque évolution du dictionnaire.
 
-**Robustesse.** Huit requêtes en parallèle, repli exponentiel sur les réponses 429, curseur de progression dans `ingest_state`. Le script est idempotent et reprenable : interrompu, il repart où il s'était arrêté.
+**Robustesse.** Huit requêtes en parallèle, repli exponentiel sur les réponses 429, et pour tout curseur de progression la colonne `movies.detail_fetched_at` — il n'existe pas de table d'état séparée, qui ne pourrait que se désynchroniser de la donnée. Le script est idempotent et reprenable : interrompu, il repart où il s'était arrêté.
 
 **Ordre de grandeur, mesuré et non estimé.** Netflix 7 060 films, Netflix avec pub 6 945, Disney+ 2 479, Canal+ 813 ; 9 971 après application du OR par TMDB, auxquels s'ajoute le top 200. Après dédoublonnage, compter **environ 10 000 films** et une cinquantaine de mégaoctets. Le premier passage demande à peu près 870 requêtes de liste et 10 000 requêtes de détail, soit 15 à 30 minutes avec huit requêtes en parallèle.
 
@@ -517,7 +518,7 @@ components/
   ui/…
 lib/
   db/schema.ts  db/queries.ts
-  deck.ts  match.ts  session.ts  roomcode.ts  tmdb.ts  keywords.ts
+  deck.ts  deck-sql.ts  match.ts  session.ts  roomcode.ts  tmdb.ts  keywords.ts
 themes/
   videoclub.css  salle-obscure.css  backgrounds.ts  tokens.css
 scripts/
@@ -534,7 +535,7 @@ tests/
 
 | Variable | Origine |
 |---|---|
-| `TMDB_API_KEY` | Créée sur themoviedb.org, section API. Serveur uniquement. |
+| `TMDB_READ_TOKEN` | Jeton d'accès en lecture (auth v4), créé sur themoviedb.org, section API. Envoyé en en-tête `Bearer` par `lib/tmdb.ts` — c'est le seul identifiant TMDB utilisé, la clé v3 n'est jamais nécessaire. Serveur uniquement. |
 | `DATABASE_URL` | Injectée par l'intégration Neon de Vercel. |
 | `SESSION_SECRET` | Générée aléatoirement, 32 octets. |
 | `CRON_SECRET` | Protège `/api/cron/ingest`. |

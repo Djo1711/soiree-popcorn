@@ -3,8 +3,8 @@ import { createHash } from 'node:crypto'
 export const BASE_WEIGHT = 1.3
 export const POPULARITY_WEIGHT = 0.6
 
-/** Diviseur de 7 caractères hexadécimaux, soit 28 bits. */
-const HASH_MAX = 0xfffffff
+/** Diviseur de 7 caractères hexadécimaux, soit 28 bits. Repris tel quel par `lib/deck-sql.ts`. */
+export const HASH_MAX = 0xfffffff
 
 /**
  * Position d'un film dans le paquet d'un salon.

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest'
+import dictionnaire from '@/data/keywords-fr.json'
 import { MAX_TAGS, buildTags, translateKeywords } from '@/lib/keywords'
 
 describe('translateKeywords', () => {
@@ -21,6 +22,14 @@ describe('translateKeywords', () => {
 
   it('ne renvoie jamais de doublon', () => {
     expect(translateKeywords(['medieval', 'medieval'])).toEqual(['moyen-âge'])
+  })
+
+  it('déduplique deux clés synonymes qui pointent sur la même traduction', () => {
+    // TMDB étiquette le même film « paris » et « paris, france ». Le dictionnaire
+    // contient les deux clés exprès ; c'est la déduplication par valeur française
+    // qui évite d'afficher deux fois le même tag et rend ces alias sans danger.
+    expect(translateKeywords(['paris', 'paris, france'])).toEqual(['paris'])
+    expect(translateKeywords(['london, england', 'london'])).toEqual(['londres'])
   })
 
   it('renvoie une liste vide pour une entrée vide', () => {
@@ -58,8 +67,6 @@ describe('buildTags', () => {
     expect(buildTags([], ['Comédie'])).toEqual(['Comédie'])
   })
 })
-
-import dictionnaire from '@/data/keywords-fr.json'
 
 describe('dictionnaire', () => {
   it('compte au moins 180 entrées', () => {

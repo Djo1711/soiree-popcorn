@@ -38,10 +38,11 @@
 | `app/layout.tsx`, `app/page.tsx`, `app/globals.css` | Coquille Next.js minimale | 1 |
 | `lib/roomcode.ts` | Génération et validation des codes de salon | 2 |
 | `lib/deck.ts` | Clé de tri pondérée du paquet | 3 |
+| `lib/deck-sql.ts` | Écriture SQL unique de la formule de tri, jamais recopiée | 3 |
 | `lib/match.ts` | Règle de match : effectif complet et seuil de « j'aime » atteint | 4, 4b |
 | `data/keywords-fr.json` | Dictionnaire mot-clé TMDB → français | 5 |
 | `lib/keywords.ts` | Traduction des mots-clés et composition des tags | 5 |
-| `lib/db/schema.ts` | Définition Drizzle des huit tables | 6 |
+| `lib/db/schema.ts` | Définition Drizzle des sept tables | 6 |
 | `lib/db/client.ts` | Connexion Neon partagée | 6 |
 | `drizzle.config.ts`, `drizzle/` | Configuration et migrations générées | 6 |
 | `tests/helpers/db.ts` | Base PGlite jetable pour les tests d'intégration | 6 |
@@ -804,7 +805,7 @@ Attendu : `16 passed`.
 
 - [ ] **Step 5: Vérifier que le seuil discrimine réellement**
 
-Remplacer temporairement la dernière ligne par `return votes >= 1`, relancer le fichier, et constater que les tests de seuil échouent. Restaurer, relancer, constater `15 passed`. Ne pas commiter la version cassée.
+Remplacer temporairement la dernière ligne par `return votes >= 1`, relancer le fichier, et constater que les tests de seuil échouent. Restaurer, relancer, constater `16 passed`. Ne pas commiter la version cassée.
 
 - [ ] **Step 6: Commit**
 
@@ -1089,7 +1090,7 @@ Le test central de cette tâche vérifie que **l'ordre produit par SQL est exact
 **Interfaces:**
 - Consumes: `deckSortKey` de la tâche 3
 - Produit :
-  - `lib/db/schema.ts` : `rooms`, `members`, `movies`, `memberFilters`, `swipes`, `matches`, `ingestState`, `rateLimits`
+  - `lib/db/schema.ts` : `rooms`, `members`, `movies`, `memberFilters`, `swipes`, `matches`, `rateLimits`
   - `lib/db/client.ts` : `db` (instance Drizzle branchée sur Neon), `pool`
   - `tests/helpers/db.ts` : `createTestDb(): Promise<{ db: TestDb; close: () => Promise<void> }>` et le type `TestDb`
 
@@ -1107,7 +1108,6 @@ import {
   doublePrecision,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   real,
@@ -1234,12 +1234,6 @@ export const matches = pgTable(
     index('matches_room_id_idx').on(t.roomCode, t.id),
   ],
 )
-
-export const ingestState = pgTable('ingest_state', {
-  key: text('key').primaryKey(),
-  value: jsonb('value').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
 
 export const rateLimits = pgTable('rate_limits', {
   key: text('key').primaryKey(),
@@ -1374,13 +1368,12 @@ async function seedMovies(count: number) {
 }
 
 describe('schéma', () => {
-  it('crée les huit tables', async () => {
+  it('crée les sept tables', async () => {
     const rows = await db.execute<{ table_name: string }>(
       sql`SELECT table_name FROM information_schema.tables WHERE table_schema = 'public'`,
     )
     const names = rows.rows.map((r) => r.table_name).sort()
     expect(names).toEqual([
-      'ingest_state',
       'matches',
       'member_filters',
       'members',
@@ -1927,7 +1920,7 @@ Cette tâche comporte une action manuelle de l'utilisateur. Ne pas tenter de cr�
 
 **Interfaces:**
 - Consumes: `scripts/migrate.ts` de la tâche 6
-- Produit : une base Neon accessible via `DATABASE_URL`, avec les huit tables créées
+- Produit : une base Neon accessible via `DATABASE_URL`, avec les sept tables créées
 
 - [ ] **Step 1: Demander à l'utilisateur de créer la base**
 
@@ -1973,7 +1966,7 @@ Attendu : `Migrations appliquées.`
 pnpm tsx -e "import 'dotenv/config'; import { sql } from 'drizzle-orm'; import { db, pool } from './lib/db/client.ts'; const r = await db.execute(sql\`SELECT table_name FROM information_schema.tables WHERE table_schema='public' ORDER BY 1\`); console.log(r.rows.map(x => x.table_name).join(', ')); await pool.end()"
 ```
 
-Attendu : `ingest_state, matches, member_filters, members, movies, rate_limits, rooms, swipes`.
+Attendu : `matches, member_filters, members, movies, rate_limits, rooms, swipes`.
 
 - [ ] **Step 5: Commit**
 

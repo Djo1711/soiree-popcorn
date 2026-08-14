@@ -7,7 +7,6 @@ import {
   doublePrecision,
   index,
   integer,
-  jsonb,
   pgTable,
   primaryKey,
   real,
@@ -16,6 +15,29 @@ import {
   unique,
   uuid,
 } from 'drizzle-orm/pg-core'
+import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH } from '../roomcode'
+
+export type MatchStatus = 'a_voir' | 'vu' | 'abandonne'
+export type ProviderKey = 'netflix' | 'canal' | 'disney'
+
+// Garde-fou de l'injection littérale ci-dessous : tant que l'alphabet reste
+// alphanumérique, le motif ne peut contenir ni quote ni métacaractère de classe.
+if (!/^[A-Z0-9]+$/.test(ROOM_CODE_ALPHABET)) {
+  throw new Error('ROOM_CODE_ALPHABET doit rester alphanumérique pour être injecté dans un CHECK.')
+}
+
+/**
+ * Le motif est dérivé de `ROOM_CODE_ALPHABET` et non recopié : la base et
+ * `lib/roomcode.ts` doivent accepter exactement le même jeu de caractères,
+ * sans quoi un code généré finirait rejeté à l'insertion.
+ *
+ * `sql.raw` est obligatoire ici : drizzle-kit sérialise un paramètre lié dans un
+ * CHECK en `$1` et produit une migration invalide. Ce n'est pas la construction
+ * de requête par concaténation bannie ailleurs — c'est du DDL bâti à partir
+ * d'une constante du module, jamais d'une saisie, et l'assertion au-dessus le
+ * garantit.
+ */
+const ROOM_CODE_PATTERN = sql.raw(`'^[${ROOM_CODE_ALPHABET}]{${ROOM_CODE_LENGTH}}$'`)
 
 export const rooms = pgTable(
   'rooms',
@@ -31,6 +53,7 @@ export const rooms = pgTable(
   (t) => [
     check('rooms_expected_members_range', sql`${t.expectedMembers} BETWEEN 2 AND 8`),
     check('rooms_threshold_range', sql`${t.matchThreshold} BETWEEN 2 AND ${t.expectedMembers}`),
+    check('rooms_code_format', sql`${t.code} ~ ${ROOM_CODE_PATTERN}`),
   ],
 )
 
@@ -78,7 +101,9 @@ export const movies = pgTable(
     index('movies_providers_idx').using('gin', t.providers),
     index('movies_release_year_idx').on(t.releaseYear),
     index('movies_vote_average_idx').on(t.voteAverage),
-    index('movies_top200_idx').on(t.inTop200),
+    // Index partiel : 200 lignes sur 10 000 portent `true`, un btree complet
+    // sur un booléen aussi déséquilibré est ignoré par le planificateur.
+    index('movies_top200_idx').on(t.id).where(sql`in_top200`),
     index('movies_detail_fetched_idx').on(t.detailFetchedAt),
   ],
 )
@@ -132,20 +157,16 @@ export const matches = pgTable(
   (t) => [
     unique('matches_room_movie_unique').on(t.roomCode, t.movieId),
     index('matches_room_id_idx').on(t.roomCode, t.id),
+    check('matches_status_valide', sql`${t.status} IN ('a_voir', 'vu', 'abandonne')`),
   ],
 )
 
-export const ingestState = pgTable('ingest_state', {
-  key: text('key').primaryKey(),
-  value: jsonb('value').notNull(),
-  updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow(),
-})
+// Pas de table `ingest_state` : la progression de l'ingestion est portée par
+// `movies.detail_fetched_at IS NULL`, qui est à la fois le curseur et la
+// donnée. Un second curseur ne pourrait que se désynchroniser du premier.
 
 export const rateLimits = pgTable('rate_limits', {
   key: text('key').primaryKey(),
   count: integer('count').notNull().default(0),
   windowStart: timestamp('window_start', { withTimezone: true }).notNull().defaultNow(),
 })
-
-export type MatchStatus = 'a_voir' | 'vu' | 'abandonne'
-export type ProviderKey = 'netflix' | 'canal' | 'disney'
