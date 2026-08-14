@@ -1,11 +1,7 @@
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
-import {
-  ROOM_CODE_ALPHABET,
-  ROOM_CODE_LENGTH,
-  generateRoomCode,
-  isValidRoomCode,
-  normalizeRoomCode,
-} from '@/lib/roomcode'
+import { ROOM_CODE_ALPHABET, ROOM_CODE_LENGTH, isValidRoomCode, normalizeRoomCode } from '@/lib/roomcode'
+import { generateRoomCode } from '@/lib/roomcode-server'
 
 describe('generateRoomCode', () => {
   it('produit un code de la bonne longueur', () => {
@@ -59,5 +55,12 @@ describe('isValidRoomCode', () => {
 
   it("refuse un code de la bonne longueur entièrement fait de caractères exclus", () => {
     expect(isValidRoomCode('IIOO01')).toBe(false)
+  })
+})
+
+describe('portabilité client', () => {
+  it('n’importe rien de Node, pour rester utilisable dans un composant client', () => {
+    const source = readFileSync('lib/roomcode.ts', 'utf8')
+    expect(source).not.toMatch(/from ['"]node:/)
   })
 })
