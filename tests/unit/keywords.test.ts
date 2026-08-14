@@ -58,3 +58,30 @@ describe('buildTags', () => {
     expect(buildTags([], ['Comédie'])).toEqual(['Comédie'])
   })
 })
+
+import dictionnaire from '@/data/keywords-fr.json'
+
+describe('dictionnaire', () => {
+  it('compte au moins 180 entrées', () => {
+    expect(Object.keys(dictionnaire).length).toBeGreaterThanOrEqual(180)
+  })
+
+  it('n’a que des clés en minuscules et sans espaces superflus', () => {
+    for (const cle of Object.keys(dictionnaire)) {
+      expect(cle).toBe(cle.toLowerCase().trim())
+    }
+  })
+
+  it('n’a aucune traduction vide', () => {
+    for (const valeur of Object.values(dictionnaire)) {
+      expect(String(valeur).trim().length).toBeGreaterThan(0)
+    }
+  })
+
+  it('exclut les mots-clés de production', () => {
+    const exclus = ['woman director', 'duringcreditsstinger', 'aftercreditsstinger']
+    for (const cle of exclus) {
+      expect(dictionnaire).not.toHaveProperty(cle)
+    }
+  })
+})
