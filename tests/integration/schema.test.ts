@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { deckSortKey } from '@/lib/deck'
 import { deckOrderBy } from '@/lib/deck-sql'
 import { matches, members, movies, rooms, swipes } from '@/lib/db/schema'
-import { generateRoomCode } from '@/lib/roomcode'
+import { generateRoomCode } from '@/lib/roomcode-server'
 import { createTestDb, type TestDb } from '@/tests/helpers/db'
 
 let db: TestDb

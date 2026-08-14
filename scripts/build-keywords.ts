@@ -1,7 +1,7 @@
 import { writeFile } from 'node:fs/promises'
 import { sql } from 'drizzle-orm'
 import dictionary from '@/data/keywords-fr.json'
-import { db, pool } from '@/lib/db/client'
+import { closePool, getDb } from '@/lib/db/client'
 import { TmdbClient } from '@/lib/tmdb'
 
 const TAILLE_ECHANTILLON = 1500
@@ -15,6 +15,7 @@ const SORTIE = 'data/keywords-a-traduire.json'
 async function main() {
   const client = new TmdbClient()
   const connus = new Set(Object.keys(dictionary as Record<string, string>))
+  const db = getDb()
 
   const result = (await db.execute(sql`
     SELECT id FROM movies ORDER BY popularity DESC NULLS LAST LIMIT ${TAILLE_ECHANTILLON}
@@ -48,7 +49,7 @@ async function main() {
 
   await writeFile(SORTIE, JSON.stringify(classement, null, 2), 'utf8')
   console.log(`${classement.length} mots-clés à trier écrits dans ${SORTIE}`)
-  await pool.end()
+  await closePool()
 }
 
 // `await` et non `void` : une promesse rejetée doit faire échouer le script avec

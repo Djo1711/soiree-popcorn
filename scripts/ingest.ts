@@ -252,7 +252,8 @@ export async function computePercentiles(db: AnyDb): Promise<void> {
 }
 
 async function main() {
-  const { db, pool } = await import('@/lib/db/client')
+  const { closePool, getDb } = await import('@/lib/db/client')
+  const db = getDb()
   const client = new TmdbClient()
   const log = (message: string) => console.log(`[${new Date().toISOString()}] ${message}`)
 
@@ -267,7 +268,7 @@ async function main() {
   } finally {
     // Sans ce `finally`, une ingestion interrompue laisse le pool ouvert et le
     // processus pend au lieu de rendre la main avec son code d'erreur.
-    await pool.end()
+    await closePool()
   }
 }
 
