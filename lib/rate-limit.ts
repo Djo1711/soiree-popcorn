@@ -1,16 +1,19 @@
 import { sql } from 'drizzle-orm'
 
-type Executor = { execute<T>(query: ReturnType<typeof sql>): Promise<{ rows: T[] }> }
-
 /**
  * Incrémente et lit le compteur en **une seule instruction**.
  *
  * Une lecture suivie d'une écriture sous-compterait précisément pendant la
  * rafale de tentatives simultanées que ce compteur existe pour arrêter : deux
  * fonctions serverless liraient la même valeur avant que l'une n'écrive.
+ *
+ * `db` est typé `any` : le client Neon réel (`getDb()`) et le client PGlite de
+ * test exposent tous deux une méthode `execute`, mais avec des signatures de
+ * retour incompatibles pour TypeScript. Même motif que dans
+ * `lib/db/queries/*.ts`, pour le même pont entre les deux clients.
  */
 export async function hitRateLimit(
-  db: Executor,
+  db: any,
   key: string,
   limit: number,
   windowSeconds: number,
