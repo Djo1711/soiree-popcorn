@@ -40,7 +40,7 @@ export async function fetchDeck(
   f: DeckFilters,
   limit: number,
 ): Promise<DeckCard[]> {
-  const result = await db.execute<Record<string, unknown>>(sql`
+  const result = (await db.execute(sql`
     SELECT movies.id, movies.title, movies.overview, movies.poster_path, movies.release_date,
            movies.release_year, movies.runtime, movies.vote_average, movies.director,
            movies.providers, movies.keywords, movies.genres
@@ -61,9 +61,9 @@ export async function fetchDeck(
       )
     ORDER BY ${deckOrderBy(roomCode)}
     LIMIT ${limit}
-  `)
+  `)) as { rows: Record<string, unknown>[] }
 
-  return result.rows.map((r) => ({
+  return result.rows.map((r: Record<string, unknown>) => ({
     id: Number(r.id),
     title: String(r.title),
     overview: (r.overview as string | null) ?? null,
@@ -79,7 +79,7 @@ export async function fetchDeck(
 }
 
 export async function countDeck(db: any, memberId: string, f: DeckFilters): Promise<number> {
-  const result = await db.execute<{ n: number }>(sql`
+  const result = (await db.execute(sql`
     SELECT count(*)::int AS n
     FROM movies
     WHERE (${f.genres.length} = 0 OR movies.genres && ${sql.param(f.genres)}::text[])
@@ -96,6 +96,6 @@ export async function countDeck(db: any, memberId: string, f: DeckFilters): Prom
       AND NOT EXISTS (
         SELECT 1 FROM swipes s WHERE s.member_id = ${memberId}::uuid AND s.movie_id = movies.id
       )
-  `)
+  `)) as { rows: { n: number }[] }
   return Number(result.rows[0].n)
 }

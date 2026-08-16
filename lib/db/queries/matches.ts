@@ -43,13 +43,13 @@ export async function listMatches(
   roomCode: string,
   status?: MatchStatus,
 ): Promise<MatchRow[]> {
-  const result = await db.execute<Record<string, unknown>>(sql`
+  const result = (await db.execute(sql`
     SELECT ${COLONNES}
     FROM matches m JOIN movies ON movies.id = m.movie_id
     WHERE m.room_code = ${roomCode}
       AND (${status === undefined} OR m.status = ${status ?? ''})
     ORDER BY m.id DESC
-  `)
+  `)) as { rows: Record<string, unknown>[] }
   return result.rows.map(versLigne)
 }
 
@@ -58,12 +58,12 @@ export async function matchesSince(
   roomCode: string,
   sinceId: number,
 ): Promise<MatchRow[]> {
-  const result = await db.execute<Record<string, unknown>>(sql`
+  const result = (await db.execute(sql`
     SELECT ${COLONNES}
     FROM matches m JOIN movies ON movies.id = m.movie_id
     WHERE m.room_code = ${roomCode} AND m.id > ${sinceId}
     ORDER BY m.id ASC
-  `)
+  `)) as { rows: Record<string, unknown>[] }
   return result.rows.map(versLigne)
 }
 
@@ -73,21 +73,21 @@ export async function setMatchStatus(
   movieId: number,
   status: MatchStatus,
 ): Promise<boolean> {
-  const result = await db.execute<{ id: number }>(sql`
+  const result = (await db.execute(sql`
     UPDATE matches SET status = ${status}, updated_at = now()
     WHERE room_code = ${roomCode} AND movie_id = ${movieId}
     RETURNING id
-  `)
+  `)) as { rows: { id: number }[] }
   return result.rows.length > 0
 }
 
 export async function randomMatch(db: any, roomCode: string): Promise<MatchRow | null> {
-  const result = await db.execute<Record<string, unknown>>(sql`
+  const result = (await db.execute(sql`
     SELECT ${COLONNES}
     FROM matches m JOIN movies ON movies.id = m.movie_id
     WHERE m.room_code = ${roomCode} AND m.status = 'a_voir'
     ORDER BY random() LIMIT 1
-  `)
+  `)) as { rows: Record<string, unknown>[] }
   const r = result.rows[0]
   return r ? versLigne(r) : null
 }

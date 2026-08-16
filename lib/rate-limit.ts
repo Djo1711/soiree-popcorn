@@ -19,7 +19,7 @@ export async function hitRateLimit(
   windowSeconds: number,
 ): Promise<{ allowed: boolean; count: number }> {
   const fenetre = sql.raw(`interval '${Math.trunc(windowSeconds)} seconds'`)
-  const result = await db.execute<{ count: number }>(sql`
+  const result = (await db.execute(sql`
     INSERT INTO rate_limits (key, count, window_start)
     VALUES (${key}, 1, now())
     ON CONFLICT (key) DO UPDATE SET
@@ -32,7 +32,7 @@ export async function hitRateLimit(
         ELSE rate_limits.window_start
       END
     RETURNING count
-  `)
+  `)) as { rows: { count: number }[] }
   const count = Number(result.rows[0].count)
   return { allowed: count <= limit, count }
 }

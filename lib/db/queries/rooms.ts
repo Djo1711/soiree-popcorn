@@ -21,16 +21,18 @@ const TENTATIVES_CODE = 5
 
 export async function getRoom(db: any, code: string): Promise<RoomSummary | null> {
   const normalise = normalizeRoomCode(code)
-  const result = await db.execute<{
-    code: string
-    expected_members: number
-    match_threshold: number
-    n: number
-  }>(sql`
+  const result = (await db.execute(sql`
     SELECT r.code, r.expected_members, r.match_threshold,
            (SELECT count(*)::int FROM members m WHERE m.room_code = r.code) AS n
     FROM rooms r WHERE r.code = ${normalise}
-  `)
+  `)) as {
+    rows: {
+      code: string
+      expected_members: number
+      match_threshold: number
+      n: number
+    }[]
+  }
   const ligne = result.rows[0]
   if (!ligne) return null
   return {

@@ -29,7 +29,7 @@ export async function recordSwipe(
 
   if (!liked) return { match: null }
 
-  const result = await db.execute<{ id: number }>(sql`
+  const result = (await db.execute(sql`
     INSERT INTO matches (room_code, movie_id)
     SELECT r.code, ${movieId}
     FROM rooms r
@@ -43,7 +43,7 @@ export async function recordSwipe(
       ) >= r.match_threshold
     ON CONFLICT (room_code, movie_id) DO NOTHING
     RETURNING id
-  `)
+  `)) as { rows: { id: number }[] }
 
   const ligne = result.rows[0]
   return ligne ? { match: { movieId, matchId: Number(ligne.id) } } : { match: null }
@@ -58,19 +58,19 @@ export async function undoLastSwipe(
   db: any,
   memberId: string,
 ): Promise<{ movieId: number } | { error: 'aucun' | 'match_cree' }> {
-  const dernier = await db.execute<{ movie_id: number; room_code: string }>(sql`
+  const dernier = (await db.execute(sql`
     SELECT s.movie_id, m.room_code
     FROM swipes s JOIN members m ON m.id = s.member_id
     WHERE s.member_id = ${memberId}::uuid
     ORDER BY s.created_at DESC
     LIMIT 1
-  `)
+  `)) as { rows: { movie_id: number; room_code: string }[] }
   const ligne = dernier.rows[0]
   if (!ligne) return { error: 'aucun' }
 
-  const match = await db.execute<{ id: number }>(sql`
+  const match = (await db.execute(sql`
     SELECT id FROM matches WHERE room_code = ${ligne.room_code} AND movie_id = ${ligne.movie_id}
-  `)
+  `)) as { rows: { id: number }[] }
   if (match.rows[0]) return { error: 'match_cree' }
 
   await db.execute(sql`
