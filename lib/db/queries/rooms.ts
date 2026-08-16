@@ -96,13 +96,26 @@ export async function createRoom(
 }
 
 /**
- * Adhésion **atomique** : l'insertion et la vérification de place tiennent
- * dans une seule instruction SQL, même patron que `recordSwipe` et
- * `hitRateLimit`. Une lecture (`getRoom`) suivie d'une écriture laisserait une
- * fenêtre où deux adhésions simultanées sur la dernière place passeraient
- * toutes les deux, dépassant `expected_members` — et comme rien ne réduit
- * jamais l'effectif d'un salon, `recordSwipe` (qui exige une égalité stricte
- * avec `expected_members`) ne créerait alors plus jamais aucun match.
+ * Adhésion **réellement atomique** : la ligne `rooms` du salon est verrouillée
+ * (`SELECT ... FOR UPDATE` dans un CTE) avant que l'insertion ne soit
+ * conditionnée sur la place restante, même patron que `recordSwipe` et
+ * `hitRateLimit`. Une seule instruction SQL ne suffit pas à elle seule : en
+ * isolation READ COMMITTED (le mode par défaut de Postgres, utilisé via le
+ * pool Neon), deux transactions concurrentes sur deux connexions distinctes
+ * prennent chacune leur propre snapshot MVCC, et un simple `count(*) <
+ * expected_members` dans le WHERE peut passer deux fois pour la même
+ * dernière place puisque chaque transaction ne voit pas l'insertion pas
+ * encore commitée de l'autre. Le `FOR UPDATE` force la seconde transaction à
+ * attendre le commit de la première avant d'acquérir à son tour le verrou sur
+ * la ligne du salon ; une fois le verrou obtenu, le `count(*)` est réévalué à
+ * cet instant précis et voit donc les insertions déjà commitées. Les deux
+ * transactions sont ainsi sérialisées sur ce salon précis — deux salons
+ * différents ne se bloquent jamais entre eux, seul le même code de salon crée
+ * de la contention. Sans cette sérialisation, deux adhésions simultanées sur
+ * la dernière place pourraient toutes les deux réussir, dépassant
+ * `expected_members` — et comme rien ne réduit jamais l'effectif d'un salon,
+ * `recordSwipe` (qui exige une égalité stricte avec `expected_members`) ne
+ * créerait alors plus jamais aucun match.
  *
  * Quand l'INSERT ne renvoie rien, une seconde lecture distingue *a posteriori*
  * un salon complet d'un prénom déjà pris : cette lecture n'a plus besoin
@@ -117,11 +130,16 @@ export async function joinRoom(
   const normalise = normalizeRoomCode(code)
 
   const insere = (await db.execute(sql`
+    WITH salon AS (
+      SELECT expected_members
+      FROM rooms
+      WHERE code = ${normalise}
+      FOR UPDATE
+    )
     INSERT INTO members (room_code, display_name)
-    SELECT r.code, ${nom}
-    FROM rooms r
-    WHERE r.code = ${normalise}
-      AND (SELECT count(*) FROM members m WHERE m.room_code = r.code) < r.expected_members
+    SELECT ${normalise}, ${nom}
+    FROM salon
+    WHERE (SELECT count(*) FROM members WHERE room_code = ${normalise}) < salon.expected_members
     ON CONFLICT (room_code, display_name) DO NOTHING
     RETURNING id, display_name
   `)) as { rows: { id: string; display_name: string }[] }
