@@ -1,9 +1,18 @@
+import { timingSafeEqual } from 'node:crypto'
 import { erreur, ok } from '@/lib/api/respond'
 import { getDb } from '@/lib/db/client'
 import { fetchDetails } from '@/scripts/ingest'
 import { TmdbClient } from '@/lib/tmdb'
 
 export const maxDuration = 60
+
+/** Comparaison à temps constant, pour ne pas exposer CRON_SECRET à une attaque temporelle. */
+function authorise(recu: string | null, attendu: string): boolean {
+  if (recu === null) return false
+  const a = Buffer.from(recu)
+  const b = Buffer.from(attendu)
+  return a.length === b.length && timingSafeEqual(a, b)
+}
 
 /**
  * Rafraîchissement partiel. Le script complet dure une vingtaine de minutes,
@@ -15,7 +24,7 @@ export const maxDuration = 60
 export async function GET(request: Request): Promise<Response> {
   const attendu = process.env.CRON_SECRET
   const recu = request.headers.get('authorization')
-  if (!attendu || recu !== `Bearer ${attendu}`) {
+  if (!attendu || !authorise(recu, `Bearer ${attendu}`)) {
     return erreur(401, 'Accès refusé.')
   }
 
