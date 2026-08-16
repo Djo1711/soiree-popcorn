@@ -1,4 +1,4 @@
-import { ok } from '@/lib/api/respond'
+import { avecErreurs, ok } from '@/lib/api/respond'
 import { exigerMembre } from '@/lib/api/guard'
 import { getDb } from '@/lib/db/client'
 import { countDeck, type DeckFilters } from '@/lib/db/queries/deck'
@@ -21,10 +21,12 @@ function depuisUrl(url: URL, defaut: DeckFilters): DeckFilters {
 }
 
 export async function GET(request: Request): Promise<Response> {
-  const session = exigerMembre(request)
-  if (session instanceof Response) return session
-  const db = getDb()
-  const enregistres = await getFilters(db, session.memberId)
-  const filtres = depuisUrl(new URL(request.url), enregistres ?? FILTRES_PAR_DEFAUT)
-  return ok({ count: await countDeck(db, session.memberId, filtres) })
+  return avecErreurs(async () => {
+    const session = exigerMembre(request)
+    if (session instanceof Response) return session
+    const db = getDb()
+    const enregistres = await getFilters(db, session.memberId)
+    const filtres = depuisUrl(new URL(request.url), enregistres ?? FILTRES_PAR_DEFAUT)
+    return ok({ count: await countDeck(db, session.memberId, filtres) })
+  })
 }

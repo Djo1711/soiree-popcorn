@@ -103,3 +103,41 @@ describe('POST /api/swipes puis GET /api/events', () => {
     expect(r.status).toBe(404)
   })
 })
+
+describe('GET /api/deck/count', () => {
+  it('rend un 500 français plutôt qu’un crash sur un paramètre non numérique', async () => {
+    const { djo } = await salonDeDeux()
+    const { GET } = await import('@/app/api/deck/count/route')
+    const r = await GET(new Request('http://x/api/deck/count?yearFrom=abc', { headers: { cookie: djo } }))
+    expect(r.status).toBe(500)
+    expect(await r.json()).toEqual({
+      erreur: 'Une erreur est survenue de notre côté. Réessayez dans un instant.',
+    })
+  })
+})
+
+describe('PUT /api/filters', () => {
+  it('rend un 500 français plutôt qu’un crash sur une année non numérique', async () => {
+    const { djo } = await salonDeDeux()
+    const { PUT } = await import('@/app/api/filters/route')
+    const r = await PUT(
+      new Request('http://x/api/filters', {
+        method: 'PUT',
+        headers: { cookie: djo, 'content-type': 'application/json' },
+        body: JSON.stringify({
+          genres: [],
+          providers: [],
+          minRating: 0,
+          yearFrom: 'abc',
+          yearTo: null,
+          maxRuntime: null,
+          includeTop200: true,
+        }),
+      }),
+    )
+    expect(r.status).toBe(500)
+    expect(await r.json()).toEqual({
+      erreur: 'Une erreur est survenue de notre côté. Réessayez dans un instant.',
+    })
+  })
+})

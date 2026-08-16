@@ -54,4 +54,73 @@ describe('POST /api/rooms', () => {
     )
     expect(r.status).toBe(400)
   })
+
+  it('refuse un prénom trop long avec le même message que /join', async () => {
+    const { POST } = await import('@/app/api/rooms/route')
+    const r = await POST(
+      await poster('http://x/api/rooms', {
+        displayName: 'x'.repeat(31),
+        expectedMembers: 2,
+        matchThreshold: 2,
+      }),
+    )
+    expect(r.status).toBe(400)
+    expect((await r.json()).erreur).toBe('Le prénom ne doit pas dépasser 30 caractères.')
+  })
+})
+
+describe('POST /api/rooms/[code]/join', () => {
+  it('refuse un prénom trop long, avec le même message que la création', async () => {
+    const { POST: creer } = await import('@/app/api/rooms/route')
+    const rCreation = await creer(
+      await poster('http://x/api/rooms', { displayName: 'Djo', expectedMembers: 3, matchThreshold: 2 }),
+    )
+    const { room } = await rCreation.json()
+
+    const { POST: rejoindre } = await import('@/app/api/rooms/[code]/join/route')
+    const r = await rejoindre(
+      await poster(`http://x/api/rooms/${room.code}/join`, { displayName: 'x'.repeat(31) }),
+      { params: Promise.resolve({ code: room.code }) },
+    )
+    expect(r.status).toBe(400)
+    expect((await r.json()).erreur).toBe('Le prénom ne doit pas dépasser 30 caractères.')
+  })
+})
+
+describe('GET /api/rooms/[code]/members', () => {
+  it('partage le même budget de tentatives que /join, pour la même IP', async () => {
+    const ip = '9.9.9.9'
+    const { POST: rejoindre } = await import('@/app/api/rooms/[code]/join/route')
+    const { GET: membres } = await import('@/app/api/rooms/[code]/members/route')
+
+    // Épuise les 10 tentatives autorisées par minute via la route join.
+    for (let i = 0; i < 10; i++) {
+      await rejoindre(
+        new Request('http://x/api/rooms/AAAAAA/join', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', 'x-forwarded-for': ip },
+          body: JSON.stringify({ displayName: 'Zzz' }),
+        }),
+        { params: Promise.resolve({ code: 'AAAAAA' }) },
+      )
+    }
+
+    // La 11e tentative, même via /members, doit être bloquée : même clé, même budget.
+    const r = await membres(
+      new Request('http://x/api/rooms/AAAAAA/members', { headers: { 'x-forwarded-for': ip } }),
+      { params: Promise.resolve({ code: 'AAAAAA' }) },
+    )
+    expect(r.status).toBe(429)
+    expect((await r.json()).erreur).toMatch(/Trop de tentatives/)
+  })
+
+  it('n’est pas affectée par le budget d’une autre IP', async () => {
+    const { GET: membres } = await import('@/app/api/rooms/[code]/members/route')
+    const r = await membres(
+      new Request('http://x/api/rooms/AAAAAA/members', { headers: { 'x-forwarded-for': '1.1.1.1' } }),
+      { params: Promise.resolve({ code: 'AAAAAA' }) },
+    )
+    // Salon inexistant mais IP neuve : la requête passe le rate-limit et échoue en 404, pas en 429.
+    expect(r.status).toBe(404)
+  })
 })

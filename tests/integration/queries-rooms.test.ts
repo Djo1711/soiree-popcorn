@@ -5,7 +5,9 @@ import {
   getRoom,
   joinRoom,
   listMembers,
+  PrenomTropLongError,
 } from '@/lib/db/queries/rooms'
+import { members } from '@/lib/db/schema'
 import { createTestDb, type TestDb } from '@/tests/helpers/db'
 
 let db: TestDb
@@ -38,6 +40,12 @@ describe('createRoom', () => {
   it('refuse un seuil hors bornes', async () => {
     await expect(createRoom(db, { ...base, expectedMembers: 4, matchThreshold: 5 })).rejects.toThrow()
     await expect(createRoom(db, { ...base, expectedMembers: 4, matchThreshold: 1 })).rejects.toThrow()
+  })
+
+  it('refuse un prénom trop long, avec la même erreur que joinRoom', async () => {
+    await expect(createRoom(db, { ...base, displayName: 'x'.repeat(31) })).rejects.toThrow(
+      PrenomTropLongError,
+    )
   })
 
   it('dote le premier membre de filtres par défaut', async () => {
@@ -77,6 +85,31 @@ describe('joinRoom', () => {
   it('refuse un prénom déjà pris dans ce salon', async () => {
     const { room } = await createRoom(db, base)
     expect(await joinRoom(db, room.code, 'Djo')).toEqual({ error: 'prenom_pris' })
+  })
+
+  it('refuse un prénom trop long, sans écrire en base', async () => {
+    const { room } = await createRoom(db, base)
+    await expect(joinRoom(db, room.code, 'x'.repeat(31))).rejects.toThrow(PrenomTropLongError)
+    expect((await getRoom(db, room.code))?.memberCount).toBe(1)
+  })
+
+  it('ne laisse qu\'une seule adhésion réussir sur deux tentatives simultanées pour la dernière place', async () => {
+    const { room } = await createRoom(db, { ...base, expectedMembers: 2, matchThreshold: 2 })
+    const [ra, rb] = await Promise.all([
+      joinRoom(db, room.code, 'Alice'),
+      joinRoom(db, room.code, 'Chloé'),
+    ])
+    const reussites = [ra, rb].filter((r) => 'member' in r)
+    expect(reussites).toHaveLength(1)
+    const echecs = [ra, rb].filter((r) => 'error' in r)
+    expect(echecs).toHaveLength(1)
+    expect((echecs[0] as { error: string }).error).toBe('complet')
+
+    const salon = await getRoom(db, room.code)
+    expect(salon?.memberCount).toBe(2)
+    expect(salon?.complete).toBe(true)
+    const lignes = await db.select().from(members)
+    expect(lignes).toHaveLength(2)
   })
 })
 

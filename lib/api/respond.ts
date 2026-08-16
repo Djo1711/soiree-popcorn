@@ -17,3 +17,21 @@ export function poserSession(response: Response, payload: SessionPayload): Respo
   )
   return response
 }
+
+/**
+ * Filet posé autour de chaque route : toute exception non prévue (secret
+ * d'environnement absent, collision de code de salon épuisée, panne de
+ * connexion à la base, paramètre non numérique provoquant une erreur SQL...)
+ * remonterait sinon comme un 500 par défaut de Next.js, sans le corps JSON
+ * `{ erreur }` en français attendu par le reste de l'application. L'erreur
+ * réelle est journalisée côté serveur ; l'utilisateur ne voit qu'un message
+ * générique.
+ */
+export async function avecErreurs(gestionnaire: () => Promise<Response>): Promise<Response> {
+  try {
+    return await gestionnaire()
+  } catch (e) {
+    console.error(e)
+    return erreur(500, 'Une erreur est survenue de notre côté. Réessayez dans un instant.')
+  }
+}

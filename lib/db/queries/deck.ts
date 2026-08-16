@@ -78,6 +78,14 @@ export async function fetchDeck(
   }))
 }
 
+/** Vérifie qu'un film fait bien partie du catalogue, avant d'enregistrer un balayage dessus. */
+export async function movieExists(db: any, movieId: number): Promise<boolean> {
+  const result = (await db.execute(sql`SELECT id FROM movies WHERE id = ${movieId}`)) as {
+    rows: { id: number }[]
+  }
+  return result.rows.length > 0
+}
+
 export async function countDeck(db: any, memberId: string, f: DeckFilters): Promise<number> {
   const result = (await db.execute(sql`
     SELECT count(*)::int AS n

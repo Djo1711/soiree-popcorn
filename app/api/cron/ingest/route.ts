@@ -1,5 +1,5 @@
 import { timingSafeEqual } from 'node:crypto'
-import { erreur, ok } from '@/lib/api/respond'
+import { avecErreurs, erreur, ok } from '@/lib/api/respond'
 import { getDb } from '@/lib/db/client'
 import { fetchDetails } from '@/scripts/ingest'
 import { TmdbClient } from '@/lib/tmdb'
@@ -22,13 +22,15 @@ function authorise(recu: string | null, attendu: string): boolean {
  * par petits morceaux ; le rafraîchissement complet reste `pnpm ingest`.
  */
 export async function GET(request: Request): Promise<Response> {
-  const attendu = process.env.CRON_SECRET
-  const recu = request.headers.get('authorization')
-  if (!attendu || !authorise(recu, `Bearer ${attendu}`)) {
-    return erreur(401, 'Accès refusé.')
-  }
+  return avecErreurs(async () => {
+    const attendu = process.env.CRON_SECRET
+    const recu = request.headers.get('authorization')
+    if (!attendu || !authorise(recu, `Bearer ${attendu}`)) {
+      return erreur(401, 'Accès refusé.')
+    }
 
-  const messages: string[] = []
-  const traites = await fetchDetails(new TmdbClient(), getDb(), (m) => messages.push(m))
-  return ok({ traites, journal: messages.slice(-5) })
+    const messages: string[] = []
+    const traites = await fetchDetails(new TmdbClient(), getDb(), (m) => messages.push(m))
+    return ok({ traites, journal: messages.slice(-5) })
+  })
 }
