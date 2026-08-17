@@ -111,6 +111,32 @@ describe('joinRoom', () => {
     const lignes = await db.select().from(members)
     expect(lignes).toHaveLength(2)
   })
+
+  it('ne consomme aucune place quand le prénom est refusé', async () => {
+    const { room } = await createRoom(db, { ...base, expectedMembers: 3, matchThreshold: 2 })
+    await joinRoom(db, room.code, 'Alice')
+    expect(await joinRoom(db, room.code, 'Alice')).toEqual({ error: 'prenom_pris' })
+    expect((await getRoom(db, room.code))?.memberCount).toBe(2)
+
+    // La place laissée libre par le refus reste attribuable : un salon ne doit
+    // jamais devenir incomplétable à cause d'une tentative rejetée.
+    expect('member' in (await joinRoom(db, room.code, 'Chloé'))).toBe(true)
+    expect((await getRoom(db, room.code))?.complete).toBe(true)
+  })
+
+  it('ne dépasse jamais l\'effectif sur une rafale de tentatives', async () => {
+    const { room } = await createRoom(db, { ...base, expectedMembers: 3, matchThreshold: 2 })
+    const resultats = await Promise.all(
+      ['Alice', 'Chloé', 'Bob', 'Dan', 'Eve'].map((n) => joinRoom(db, room.code, n)),
+    )
+    expect(resultats.filter((r) => 'member' in r)).toHaveLength(2)
+    expect(resultats.filter((r) => 'error' in r)).toHaveLength(3)
+
+    const salon = await getRoom(db, room.code)
+    expect(salon?.memberCount).toBe(3)
+    expect(salon?.complete).toBe(true)
+    expect(await db.select().from(members)).toHaveLength(3)
+  })
 })
 
 describe('claimMember', () => {

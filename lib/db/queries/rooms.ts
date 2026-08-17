@@ -96,30 +96,48 @@ export async function createRoom(
 }
 
 /**
- * Adhésion **réellement atomique** : la ligne `rooms` du salon est verrouillée
- * (`SELECT ... FOR UPDATE` dans un CTE) avant que l'insertion ne soit
- * conditionnée sur la place restante, même patron que `recordSwipe` et
- * `hitRateLimit`. Une seule instruction SQL ne suffit pas à elle seule : en
- * isolation READ COMMITTED (le mode par défaut de Postgres, utilisé via le
- * pool Neon), deux transactions concurrentes sur deux connexions distinctes
- * prennent chacune leur propre snapshot MVCC, et un simple `count(*) <
- * expected_members` dans le WHERE peut passer deux fois pour la même
- * dernière place puisque chaque transaction ne voit pas l'insertion pas
- * encore commitée de l'autre. Le `FOR UPDATE` force la seconde transaction à
- * attendre le commit de la première avant d'acquérir à son tour le verrou sur
- * la ligne du salon ; une fois le verrou obtenu, le `count(*)` est réévalué à
- * cet instant précis et voit donc les insertions déjà commitées. Les deux
- * transactions sont ainsi sérialisées sur ce salon précis — deux salons
- * différents ne se bloquent jamais entre eux, seul le même code de salon crée
- * de la contention. Sans cette sérialisation, deux adhésions simultanées sur
- * la dernière place pourraient toutes les deux réussir, dépassant
- * `expected_members` — et comme rien ne réduit jamais l'effectif d'un salon,
- * `recordSwipe` (qui exige une égalité stricte avec `expected_members`) ne
- * créerait alors plus jamais aucun match.
+ * Adhésion sérialisée par un verrou de ligne, en **deux instructions** dans une
+ * transaction explicite. C'est la seule des fonctions d'écriture du projet qui
+ * ne tient pas en une instruction, et la raison tient entièrement aux règles de
+ * snapshot de l'isolation READ COMMITTED (le mode par défaut de Postgres,
+ * utilisé via le pool Neon comme via PGlite).
  *
- * Quand l'INSERT ne renvoie rien, une seconde lecture distingue *a posteriori*
- * un salon complet d'un prénom déjà pris : cette lecture n'a plus besoin
- * d'être atomique avec l'écriture, elle ne sert qu'à choisir le bon message.
+ * L'enjeu : deux adhésions simultanées sur la dernière place ne doivent pas
+ * réussir toutes les deux. Comme rien ne réduit jamais l'effectif d'un salon,
+ * un dépassement de `expected_members` est définitif, et `recordSwipe` (qui
+ * exige une égalité stricte avec `expected_members`) ne créerait alors plus
+ * jamais aucun match dans ce salon.
+ *
+ * Pourquoi une seule instruction ne suffit pas, même avec `FOR UPDATE` : en
+ * READ COMMITTED, chaque *instruction* prend son snapshot au moment où elle
+ * commence, et ce snapshot gouverne toutes ses lectures. Verrouiller la ligne
+ * `rooms` dans un CTE fait bien attendre la seconde transaction, mais quand
+ * elle repart, elle continue d'évaluer `count(*) FROM members` sur le snapshot
+ * pris *avant* le commit de la première : elle ne voit donc pas le membre que
+ * l'autre vient d'insérer. La documentation Postgres est explicite là-dessus —
+ * une commande qui écrit « peut voir les effets des commandes concurrentes sur
+ * les lignes qu'elle cherche à modifier, mais pas leurs effets sur les autres
+ * lignes de la base ». Le rafraîchissement ne concerne que la ligne verrouillée
+ * elle-même (ici `rooms`), jamais une sous-requête sur une autre table (ici
+ * `members`). Le verrou n'ajoutait donc que de la latence.
+ *
+ * Ce que fait la version ci-dessous : le `SELECT ... FOR UPDATE` est une
+ * instruction à part entière, et l'INSERT qui suit en est une seconde — donc
+ * avec un **snapshot neuf**, pris une fois le verrou déjà acquis. Ce snapshot
+ * voit tout ce qui a été commité par la transaction précédemment détentrice du
+ * verrou, y compris son insertion dans `members`. Le `count(*)` est alors juste,
+ * et il ne peut plus bouger tant que le verrou est tenu puisque toute autre
+ * adhésion sur ce salon doit passer par ce même verrou. Deux salons différents
+ * ne se bloquent jamais entre eux : seul un même code de salon crée de la
+ * contention.
+ *
+ * L'invariant reste porté par la table `members` seule, sans compteur
+ * dénormalisé sur `rooms` : un compteur incrémenté avant l'INSERT devrait être
+ * décrémenté quand le prénom se révèle déjà pris, et toute décrémentation
+ * manquée condamnerait le salon à ne plus jamais se remplir.
+ *
+ * Quand l'INSERT ne renvoie rien, une dernière lecture — toujours sous le
+ * verrou, donc exacte — distingue un salon complet d'un prénom déjà pris.
  */
 export async function joinRoom(
   db: any,
@@ -129,31 +147,41 @@ export async function joinRoom(
   const nom = validerPrenom(displayName)
   const normalise = normalizeRoomCode(code)
 
-  const insere = (await db.execute(sql`
-    WITH salon AS (
-      SELECT expected_members
-      FROM rooms
-      WHERE code = ${normalise}
-      FOR UPDATE
-    )
-    INSERT INTO members (room_code, display_name)
-    SELECT ${normalise}, ${nom}
-    FROM salon
-    WHERE (SELECT count(*) FROM members WHERE room_code = ${normalise}) < salon.expected_members
-    ON CONFLICT (room_code, display_name) DO NOTHING
-    RETURNING id, display_name
-  `)) as { rows: { id: string; display_name: string }[] }
+  const issue: { member: MemberSummary } | { error: 'introuvable' | 'complet' | 'prenom_pris' } =
+    await db.transaction(async (tx: any) => {
+      // Instruction 1 : prise du verrou. Attend le commit de toute autre
+      // adhésion en cours sur ce salon.
+      const salon = (await tx.execute(sql`
+        SELECT expected_members FROM rooms WHERE code = ${normalise} FOR UPDATE
+      `)) as { rows: { expected_members: number }[] }
+      const ligneSalon = salon.rows[0]
+      if (!ligneSalon) return { error: 'introuvable' as const }
 
-  const ligne = insere.rows[0]
-  if (!ligne) {
-    const room = await getRoom(db, normalise)
-    if (!room) return { error: 'introuvable' }
-    if (room.complete) return { error: 'complet' }
-    return { error: 'prenom_pris' }
-  }
+      // Instruction 2 : snapshot neuf, pris après l'acquisition du verrou — le
+      // `count(*)` inclut donc les adhésions commitées pendant l'attente.
+      const insere = (await tx.execute(sql`
+        INSERT INTO members (room_code, display_name)
+        SELECT ${normalise}, ${nom}
+        WHERE (SELECT count(*) FROM members WHERE room_code = ${normalise})
+              < ${Number(ligneSalon.expected_members)}::int
+        ON CONFLICT (room_code, display_name) DO NOTHING
+        RETURNING id, display_name
+      `)) as { rows: { id: string; display_name: string }[] }
 
-  await db.insert(memberFilters).values({ memberId: ligne.id }).onConflictDoNothing()
-  return { member: { id: ligne.id, displayName: ligne.display_name } }
+      const ligne = insere.rows[0]
+      if (ligne) return { member: { id: ligne.id, displayName: ligne.display_name } }
+
+      // Rien d'inséré : soit la place manquait, soit le prénom était pris.
+      const pris = (await tx.execute(sql`
+        SELECT 1 FROM members WHERE room_code = ${normalise} AND display_name = ${nom}
+      `)) as { rows: unknown[] }
+      return { error: pris.rows[0] ? ('prenom_pris' as const) : ('complet' as const) }
+    })
+
+  if ('error' in issue) return issue
+
+  await db.insert(memberFilters).values({ memberId: issue.member.id }).onConflictDoNothing()
+  return issue
 }
 
 export async function listMembers(db: any, code: string): Promise<MemberSummary[]> {
