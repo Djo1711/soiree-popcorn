@@ -1,0 +1,86 @@
+[data-theme='videoclub'] {
+  --sp-bg: #0e2e2a;
+  --sp-bg-2: #eadfc3;
+  --sp-surface: #f3e9d2;
+  --sp-ink: #1b140c;
+  --sp-ink-soft: #6b5a3e;
+  --sp-accent: #e4572e;
+  --sp-accent-ink: #1b0d08;
+  --sp-danger: #b3261e;
+  --sp-radius-card: 20px;
+  --sp-radius-pill: 999px;
+  --sp-font-display: var(--font-anton), sans-serif;
+  --sp-font-meta: var(--font-space-mono), monospace;
+  --sp-grain-opacity: 0.05;
+  --sp-shadow-card: 0 12px 32px -8px rgba(14, 46, 42, 0.55);
+}
+
+/* §8.3 — quatre fonds : uni, grain léger, motif d'étagère, teinté par l'affiche. */
+[data-theme='videoclub'][data-bg='1'] {
+  --sp-grain-opacity: 0;
+}
+
+[data-theme='videoclub'][data-bg='2'] {
+  --sp-grain-opacity: 0.08;
+}
+
+[data-theme='videoclub'][data-bg='3'] .sp-page {
+  background-image:
+    repeating-linear-gradient(
+      to bottom,
+      rgba(243, 233, 210, 0.04) 0,
+      rgba(243, 233, 210, 0.04) 2px,
+      transparent 2px,
+      transparent 96px
+    ),
+    var(--sp-bg);
+}
+
+/* Fond « teinté » (fond 4) : lib/color-extract.ts pose --sp-tint-a/--sp-tint-b
+   sur .sp-page en style inline (tâche 14) ; ce dégradé les consomme. */
+[data-theme='videoclub'][data-bg='4'] .sp-page {
+  background: linear-gradient(
+    160deg,
+    var(--sp-tint-a, var(--sp-bg)) 0%,
+    var(--sp-tint-b, var(--sp-bg)) 100%
+  );
+  transition: background 600ms ease;
+}
+
+/* §8.4 — la carte s'éjecte vers le haut comme une cassette, un bandeau claque dessus. */
+[data-theme='videoclub'] .sp-match-card {
+  animation: sp-videoclub-eject 480ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+[data-theme='videoclub'] .sp-match-banner {
+  animation: sp-videoclub-slam 220ms ease-out 380ms backwards;
+}
+
+@keyframes sp-videoclub-eject {
+  0% {
+    transform: translateY(40px) scale(0.9);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes sp-videoclub-slam {
+  0% {
+    transform: translateY(-16px) rotate(-4deg);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0) rotate(-2deg);
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='videoclub'] .sp-match-card,
+  [data-theme='videoclub'] .sp-match-banner {
+    animation: sp-fade 120ms ease-out;
+  }
+}
