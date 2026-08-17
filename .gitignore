@@ -18,6 +18,7 @@ build/
 
 # outils
 .superpowers/
+.worktrees/
 .DS_Store
 *.log
 coverage/
