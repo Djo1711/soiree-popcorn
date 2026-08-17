@@ -7,6 +7,7 @@ import { annulerDernierBalayage, balayer, paquet } from '@/lib/api-client'
 import { useRoomEvents } from '@/lib/use-room-events'
 import { CardStack } from '@/components/swipe/CardStack'
 import { SwipeControls } from '@/components/swipe/SwipeControls'
+import { MovieSheet } from '@/components/swipe/MovieSheet'
 import type { DeckCard } from '@/lib/db/queries/deck'
 
 export default function EcranBalayage() {
@@ -15,6 +16,7 @@ export default function EcranBalayage() {
   const [cartes, setCartes] = useState<DeckCard[]>([])
   const [messageVide, setMessageVide] = useState<string | null>(null)
   const [dernierBalaye, setDernierBalaye] = useState<number | null>(null)
+  const [filmDetail, setFilmDetail] = useState<DeckCard | null>(null)
 
   const rechargerPaquet = useCallback(() => {
     paquet(20).then(({ cards, message }) => {
@@ -74,9 +76,7 @@ export default function EcranBalayage() {
           <CardStack
             cartes={cartes}
             onBalayage={traiterBalayage}
-            onDetail={() => {
-              /* branché à la feuille détail en tâche 9 */
-            }}
+            onDetail={(id) => setFilmDetail(cartes.find((c) => c.id === id) ?? null)}
           />
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
@@ -94,11 +94,11 @@ export default function EcranBalayage() {
           onRembobiner={rembobiner}
           onRejeter={() => traiterBalayage(carteHaut.id, 'rejette')}
           onAimer={() => traiterBalayage(carteHaut.id, 'aime')}
-          onDetail={() => {
-            /* branché en tâche 9 */
-          }}
+          onDetail={() => setFilmDetail(carteHaut ?? null)}
         />
       )}
+
+      <MovieSheet film={filmDetail} onFermer={() => setFilmDetail(null)} />
     </main>
   )
 }
