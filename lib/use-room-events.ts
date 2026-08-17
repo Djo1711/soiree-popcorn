@@ -1,0 +1,42 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import { ApiClientError, evenements } from '@/lib/api-client'
+import { ETAT_INITIAL, fusionnerEvenements, type EtatSalon } from '@/lib/room-events'
+
+const INTERVALLE_PAR_DEFAUT_MS = 4000
+
+export function useRoomEvents(intervalleMs = INTERVALLE_PAR_DEFAUT_MS): EtatSalon {
+  const [etat, setEtat] = useState<EtatSalon>(ETAT_INITIAL)
+  const curseurRef = useRef(0)
+
+  useEffect(() => {
+    let annule = false
+
+    async function rafraichir() {
+      try {
+        const reponse = await evenements(curseurRef.current)
+        if (annule) return
+        setEtat((precedent) => {
+          const suivant = fusionnerEvenements(precedent, reponse)
+          curseurRef.current = suivant.curseur
+          return suivant
+        })
+      } catch (e) {
+        if (annule) return
+        if (e instanceof ApiClientError && e.status === 401) {
+          setEtat({ ...ETAT_INITIAL, sansSession: true })
+        }
+      }
+    }
+
+    rafraichir()
+    const id = setInterval(rafraichir, intervalleMs)
+    return () => {
+      annule = true
+      clearInterval(id)
+    }
+  }, [intervalleMs])
+
+  return etat
+}
