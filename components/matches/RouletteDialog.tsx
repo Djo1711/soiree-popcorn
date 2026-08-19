@@ -12,28 +12,38 @@ const DUREE_REDUITE_MS = 120
 export function RouletteDialog({ ouverte, onFermer }: { ouverte: boolean; onFermer: () => void }) {
   const [tirage, setTirage] = useState<'attente' | 'defilement' | 'termine'>('attente')
   const [gagnant, setGagnant] = useState<MatchRow | null>(null)
+  const [tentative, setTentative] = useState(0)
+  const [erreur, setErreur] = useState(false)
   const reduit = useReducedMotion()
 
   useEffect(() => {
     if (!ouverte) {
       setTirage('attente')
       setGagnant(null)
+      setErreur(false)
       return
     }
     let annule = false
     setTirage('defilement')
+    setErreur(false)
     const duree = reduit ? DUREE_REDUITE_MS : DUREE_ROULETTE_MS
-    tirerAuSort().then((match) => {
-      if (annule) return
-      setGagnant(match)
-      setTimeout(() => {
-        if (!annule) setTirage('termine')
-      }, duree)
-    })
+    tirerAuSort()
+      .then((match) => {
+        if (annule) return
+        setGagnant(match)
+        setTimeout(() => {
+          if (!annule) setTirage('termine')
+        }, duree)
+      })
+      .catch(() => {
+        if (annule) return
+        setErreur(true)
+        setTirage('termine')
+      })
     return () => {
       annule = true
     }
-  }, [ouverte, reduit])
+  }, [ouverte, reduit, tentative])
 
   if (!ouverte) return null
 
@@ -67,15 +77,15 @@ export function RouletteDialog({ ouverte, onFermer }: { ouverte: boolean; onFerm
           </motion.div>
         )}
       </div>
-      {tirage === 'termine' && gagnant && (
+      {tirage === 'termine' && (
         <>
           <h3 style={{ fontFamily: 'var(--sp-font-display)' }} className="text-xl">
-            {gagnant.movie.title}
+            {gagnant ? gagnant.movie.title : erreur ? 'Une erreur est survenue.' : 'Aucun film à voir pour l’instant.'}
           </h3>
           <div className="flex gap-2">
             <button
               type="button"
-              onClick={() => setTirage('defilement')}
+              onClick={() => setTentative((t) => t + 1)}
               className="min-h-11 rounded-[var(--sp-radius-pill)] border px-4"
               style={{ borderColor: 'var(--sp-ink-soft)' }}
             >
