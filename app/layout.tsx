@@ -5,6 +5,8 @@ import './globals.css'
 export const metadata: Metadata = {
   title: 'Soirée Popcorn',
   description: 'Choisissez un film à deux, en balayant.',
+  icons: { apple: '/icon.svg' },
+  appleWebApp: { capable: true, statusBarStyle: 'black-translucent', title: 'Popcorn' },
 }
 
 const anton = Anton({ subsets: ['latin'], weight: '400', variable: '--font-anton' })
