@@ -83,10 +83,11 @@ export function SettingsSheet({
                 onClick={() => definirFond(f)}
                 data-theme={theme}
                 data-bg={f}
-                className="sp-page min-h-11 aspect-square"
+                className="aspect-square min-h-11"
                 style={{
                   borderRadius: 'var(--sp-radius-card)',
                   border: fond === f ? '3px solid var(--sp-accent)' : '1px solid var(--sp-ink-soft)',
+                  background: 'var(--sp-bg)',
                 }}
               />
             ))}
