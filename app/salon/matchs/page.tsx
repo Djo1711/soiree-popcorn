@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { changerStatutMatch, listerMatchs } from '@/lib/api-client'
 import { MatchGrid } from '@/components/matches/MatchGrid'
+import { RouletteDialog } from '@/components/matches/RouletteDialog'
 import type { MatchRow } from '@/lib/db/queries/matches'
 import type { MatchStatus } from '@/lib/db/schema'
 
@@ -16,6 +17,7 @@ const ONGLETS: { statut: MatchStatus; libelle: string }[] = [
 export default function PageMatchs() {
   const [statut, setStatut] = useState<MatchStatus>('a_voir')
   const [matchs, setMatchs] = useState<MatchRow[]>([])
+  const [rouletteOuverte, setRouletteOuverte] = useState(false)
 
   useEffect(() => {
     listerMatchs(statut).then(({ matches }) => setMatchs(matches))
@@ -62,6 +64,7 @@ export default function PageMatchs() {
         <div className="p-4">
           <button
             type="button"
+            onClick={() => setRouletteOuverte(true)}
             className="min-h-11 w-full rounded-[var(--sp-radius-pill)]"
             style={{ background: 'var(--sp-accent)', color: 'var(--sp-accent-ink)' }}
           >
@@ -69,6 +72,8 @@ export default function PageMatchs() {
           </button>
         </div>
       )}
+
+      <RouletteDialog ouverte={rouletteOuverte} onFermer={() => setRouletteOuverte(false)} />
     </main>
   )
 }
