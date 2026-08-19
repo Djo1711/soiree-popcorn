@@ -123,3 +123,7 @@ export async function ecrireFiltres(filtres: DeckFilters): Promise<DeckFilters> 
   })
   return filters
 }
+
+export async function quitterSalon(): Promise<void> {
+  await appeler('/api/session/leave', { method: 'POST' })
+}

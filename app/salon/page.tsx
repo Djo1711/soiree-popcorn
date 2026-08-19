@@ -11,6 +11,7 @@ import { SwipeControls } from '@/components/swipe/SwipeControls'
 import { MovieSheet } from '@/components/swipe/MovieSheet'
 import { MatchOverlay } from '@/components/swipe/MatchOverlay'
 import { FilterSheet } from '@/components/filters/FilterSheet'
+import { SettingsSheet } from '@/components/settings/SettingsSheet'
 import type { DeckCard } from '@/lib/db/queries/deck'
 import type { MatchRow } from '@/lib/db/queries/matches'
 
@@ -22,6 +23,7 @@ export default function EcranBalayage() {
   const [dernierBalaye, setDernierBalaye] = useState<number | null>(null)
   const [filmDetail, setFilmDetail] = useState<DeckCard | null>(null)
   const [filtresOuverts, setFiltresOuverts] = useState(false)
+  const [reglagesOuverts, setReglagesOuverts] = useState(false)
   const [matchAffiche, setMatchAffiche] = useState<MatchRow | null>(null)
   const [dernierMatchVu, setDernierMatchVu] = useState(0)
 
@@ -87,6 +89,14 @@ export default function EcranBalayage() {
         >
           ⚙ Filtres
         </button>
+        <button
+          type="button"
+          aria-label="Réglages"
+          onClick={() => setReglagesOuverts(true)}
+          className="min-h-11 px-3"
+        >
+          ⚙︎
+        </button>
         <Link href="/salon/matchs" className="sp-meta">
           {evenementsSalon.matches.length} match{evenementsSalon.matches.length > 1 ? 's' : ''}
         </Link>
@@ -138,6 +148,17 @@ export default function EcranBalayage() {
         ouverte={filtresOuverts}
         onFermer={() => setFiltresOuverts(false)}
         onAppliquer={rechargerPaquet}
+      />
+
+      <SettingsSheet
+        ouverte={reglagesOuverts}
+        onFermer={() => setReglagesOuverts(false)}
+        code={evenementsSalon.room?.code ?? ''}
+        lien={
+          typeof window !== 'undefined' && evenementsSalon.room
+            ? `${window.location.origin}/j/${evenementsSalon.room.code}`
+            : ''
+        }
       />
 
       <MovieSheet film={filmDetail} onFermer={() => setFilmDetail(null)} />
