@@ -8,8 +8,10 @@ import { useRoomEvents } from '@/lib/use-room-events'
 import { CardStack } from '@/components/swipe/CardStack'
 import { SwipeControls } from '@/components/swipe/SwipeControls'
 import { MovieSheet } from '@/components/swipe/MovieSheet'
+import { MatchOverlay } from '@/components/swipe/MatchOverlay'
 import { FilterSheet } from '@/components/filters/FilterSheet'
 import type { DeckCard } from '@/lib/db/queries/deck'
+import type { MatchRow } from '@/lib/db/queries/matches'
 
 export default function EcranBalayage() {
   const router = useRouter()
@@ -19,6 +21,8 @@ export default function EcranBalayage() {
   const [dernierBalaye, setDernierBalaye] = useState<number | null>(null)
   const [filmDetail, setFilmDetail] = useState<DeckCard | null>(null)
   const [filtresOuverts, setFiltresOuverts] = useState(false)
+  const [matchAffiche, setMatchAffiche] = useState<MatchRow | null>(null)
+  const [dernierMatchVu, setDernierMatchVu] = useState(0)
 
   const rechargerPaquet = useCallback(() => {
     paquet(20).then(({ cards, message }) => {
@@ -34,6 +38,14 @@ export default function EcranBalayage() {
   useEffect(() => {
     if (evenementsSalon.sansSession) router.replace('/')
   }, [evenementsSalon.sansSession, router])
+
+  useEffect(() => {
+    const nouveau = evenementsSalon.matches.find((m) => m.matchId > dernierMatchVu)
+    if (nouveau) {
+      setMatchAffiche(nouveau)
+      setDernierMatchVu(nouveau.matchId)
+    }
+  }, [evenementsSalon.matches, dernierMatchVu])
 
   async function traiterBalayage(id: number, sens: 'aime' | 'rejette') {
     setCartes((precedent) => precedent.filter((c) => c.id !== id))
@@ -120,6 +132,13 @@ export default function EcranBalayage() {
       />
 
       <MovieSheet film={filmDetail} onFermer={() => setFilmDetail(null)} />
+
+      <MatchOverlay
+        match={matchAffiche}
+        prenoms={evenementsSalon.members.map((m) => m.displayName)}
+        onFermer={() => setMatchAffiche(null)}
+        onVoirMatchs={() => router.push('/salon/matchs')}
+      />
     </main>
   )
 }
