@@ -8,6 +8,7 @@ import { useRoomEvents } from '@/lib/use-room-events'
 import { CardStack } from '@/components/swipe/CardStack'
 import { SwipeControls } from '@/components/swipe/SwipeControls'
 import { MovieSheet } from '@/components/swipe/MovieSheet'
+import { FilterSheet } from '@/components/filters/FilterSheet'
 import type { DeckCard } from '@/lib/db/queries/deck'
 
 export default function EcranBalayage() {
@@ -17,6 +18,7 @@ export default function EcranBalayage() {
   const [messageVide, setMessageVide] = useState<string | null>(null)
   const [dernierBalaye, setDernierBalaye] = useState<number | null>(null)
   const [filmDetail, setFilmDetail] = useState<DeckCard | null>(null)
+  const [filtresOuverts, setFiltresOuverts] = useState(false)
 
   const rechargerPaquet = useCallback(() => {
     paquet(20).then(({ cards, message }) => {
@@ -56,6 +58,14 @@ export default function EcranBalayage() {
         <span className="sp-meta" style={{ color: 'var(--sp-ink-soft)' }}>
           {evenementsSalon.room?.code ?? '……'}
         </span>
+        <button
+          type="button"
+          aria-label="Filtres"
+          onClick={() => setFiltresOuverts(true)}
+          className="min-h-11 px-3"
+        >
+          ⚙ Filtres
+        </button>
         <Link href="/salon/matchs" className="sp-meta">
           {evenementsSalon.matches.length} match{evenementsSalon.matches.length > 1 ? 's' : ''}
         </Link>
@@ -81,7 +91,12 @@ export default function EcranBalayage() {
         ) : (
           <div className="flex h-full flex-col items-center justify-center gap-3 p-6 text-center">
             <p>{messageVide ?? 'Plus aucun film pour l’instant.'}</p>
-            <button type="button" className="underline" style={{ color: 'var(--sp-accent)' }}>
+            <button
+              type="button"
+              className="underline"
+              style={{ color: 'var(--sp-accent)' }}
+              onClick={() => setFiltresOuverts(true)}
+            >
               Modifier les filtres
             </button>
           </div>
@@ -97,6 +112,12 @@ export default function EcranBalayage() {
           onDetail={() => setFilmDetail(carteHaut ?? null)}
         />
       )}
+
+      <FilterSheet
+        ouverte={filtresOuverts}
+        onFermer={() => setFiltresOuverts(false)}
+        onAppliquer={rechargerPaquet}
+      />
 
       <MovieSheet film={filmDetail} onFermer={() => setFilmDetail(null)} />
     </main>
