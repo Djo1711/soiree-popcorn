@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { annulerDernierBalayage, balayer, paquet } from '@/lib/api-client'
+import { appliquerTeinte } from '@/lib/color-extract'
 import { useRoomEvents } from '@/lib/use-room-events'
 import { CardStack } from '@/components/swipe/CardStack'
 import { SwipeControls } from '@/components/swipe/SwipeControls'
@@ -63,6 +64,14 @@ export default function EcranBalayage() {
   }
 
   const carteHaut = cartes[0]
+
+  useEffect(() => {
+    if (document.documentElement.dataset.bg !== '4' || !carteHaut?.posterPath) return
+    const img = new window.Image()
+    img.crossOrigin = 'anonymous'
+    img.src = `https://image.tmdb.org/t/p/w92${carteHaut.posterPath}`
+    img.onload = () => appliquerTeinte(document.body, carteHaut.posterPath!, img)
+  }, [carteHaut])
 
   return (
     <main className="sp-page flex min-h-dvh flex-col">
