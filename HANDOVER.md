@@ -1,6 +1,6 @@
 # Soirée Popcorn — état des lieux et reprise
 
-**Dernière mise à jour :** 14 août 2026
+**Dernière mise à jour :** 9 septembre 2026
 **Dépôt :** https://github.com/Djo1711/soiree-popcorn (privé)
 **Auteur du projet :** Geoffroy (Djo)
 
@@ -29,7 +29,8 @@ Les décisions structurantes, toutes déjà prises et justifiées dans la spec :
 
 1. `docs/superpowers/specs/2026-08-12-soiree-popcorn-design.md` — la spec, l'intention et les arbitrages
 2. `docs/superpowers/plans/2026-08-12-soiree-popcorn-1-fondations-catalogue.md` — plan 1, **terminé**
-3. `docs/superpowers/plans/2026-08-14-soiree-popcorn-2-session-et-api.md` — plan 2, **en cours**
+3. `docs/superpowers/plans/2026-08-14-soiree-popcorn-2-session-et-api.md` — plan 2, **terminé**
+4. `docs/superpowers/plans/2026-08-17-soiree-popcorn-3-interface-et-deploiement.md` — plan 3, **terminé**
 
 ---
 
@@ -46,29 +47,28 @@ Dix tâches, toutes relues, plus une revue finale de branche. Fusionné dans `ma
 
 **La base Neon est remplie** : 10 131 films, avec affiche (99,3 %), synopsis français (84,4 %), année (100 %), durée (98,7 %), genres (98,7 %) et tags français.
 
-### En cours — plan 2 : session et API
+### Terminé — plan 2 : session et API
 
-Onze tâches. **La tâche 1 est faite et relue.** Elle soldait trois dettes que la revue du plan 1 avait reportées : une connexion qui levait à l'import et aurait cassé `next build`, un garde dépendant de la version de Node, et `roomcode.ts` qui embarquait `node:crypto` dans un module dont le navigateur aura besoin.
+Onze tâches, toutes relues, plus une revue finale de branche (bug critique trouvé et corrigé : atomicité de `joinRoom`, voir §5). Fusionné dans `main` via PR.
 
-**Branche courante :** `plan-2-session-et-api`, à jour sur GitHub.
-**Tests :** 89, tous verts.
+- Cookie de session signé en HMAC, limitation de débit atomique.
+- Toutes les requêtes de salon, paquet, balayage/match/annulation, matchs/événements/filtres.
+- Les 15 routes API (`app/api/**/route.ts`) et le parcours complet vérifié côté API (`tests/integration/parcours.test.ts`).
 
-### À faire
+### Terminé — plan 3 : interface et déploiement
 
-**Plan 2, tâches 2 à 11** — tout est écrit, avec le code dans le document :
+Dix-sept tâches, toutes relues, plus une revue finale de branche et deux rounds de correction (voir §6 pour les deux points laissés volontairement ouverts). Sur la branche `plan-3-interface-et-deploiement`, prête à être fusionnée dans `main` (ou déjà fusionnée — voir l'historique git si ce document n'a pas été mis à jour depuis).
 
-2. Cookie de session signé en HMAC
-3. Limitation de débit atomique
-4. Requêtes de salon
-5. Requêtes du paquet de cartes
-6. Balayage, création de match, annulation
-7. Matchs, événements et filtres
-8. Socle des routes et routes de salon
-9. Routes du paquet, du balayage et des événements
-10. Routes des matchs, des filtres et du cron
-11. Parcours complet par l'API
+- Deux thèmes (*Vidéo-club*, *Salle obscure*) sur 16 variables CSS `--sp-*`, quatre fonds chacun.
+- Écrans : accueil (création/adhésion), salle d'attente, balayage de cartes (geste + boutons), feuille de détail, feuille de filtres, superposition de match, page « Nos matchs » à trois statuts, roulette « Décide pour nous », réglages (thème, fond, code, lien, quitter le salon).
+- PWA installable (manifeste, icône), cron de déploiement Vercel.
+- Test Playwright à deux navigateurs (`tests/e2e/`), contre une vraie base Postgres — c'est la seule partie de la suite qui a besoin d'un `DATABASE_URL` réel plutôt que PGlite.
 
-**Plan 3 — pas encore écrit.** Il couvrira : les deux thèmes et leurs variables CSS, la pile de cartes et ses gestes, la feuille de détail, la feuille de filtres, la superposition de match, la page des matchs et sa roulette, l'installation sur téléphone, le test Playwright à deux navigateurs, et le déploiement Vercel.
+**Tests :** 227, tous verts (unitaires + intégration sur PGlite) + 2 tests e2e (Playwright, contre une vraie base).
+
+### À faire — rien de planifié
+
+Les trois plans prévus sont terminés. Le §6 liste deux trous du plan 3 découverts en revue finale (prénom absent des réglages, écran de récupération d'identité) qui n'ont jamais été assignés à une tâche — candidats naturels pour un éventuel « plan 4 » si le besoin s'en fait sentir, mais rien n'est bloquant pour un usage normal.
 
 ---
 
@@ -79,21 +79,21 @@ git clone git@github.com:Djo1711/soiree-popcorn.git
 cd soiree-popcorn
 pnpm install
 cp .env.example .env.local   # puis remplir, voir ci-dessous
-pnpm test                    # doit afficher 89 passed
+pnpm test                    # doit afficher 227 passed
 ```
 
 ### Les secrets, qui ne sont pas dans le dépôt
 
-`.env.local` est ignoré par git — **il disparaît avec la machine**. Aucun secret n'a jamais été commité, ni dans les fichiers suivis ni dans l'historique (vérifié). Il faudra le reconstituer :
+`.env.local` est ignoré par git — **il disparaît avec la machine**. Aucun secret n'a jamais été commité, ni dans les fichiers suivis ni dans l'historique (vérifié à plusieurs reprises, y compris en revue finale de branche). Il faudra le reconstituer sur toute nouvelle machine :
 
 | Variable | Où la retrouver |
 |---|---|
-| `TMDB_READ_TOKEN` | themoviedb.org → Paramètres → API → « jeton d'accès en lecture » (auth v4). C'est le seul identifiant TMDB utilisé. |
-| `DATABASE_URL` | Tableau de bord Neon → projet `soiree-popcorn` → chaîne de connexion. La base et ses 10 131 films sont intacts, ils ne dépendent pas de la machine. |
-| `SESSION_SECRET` | À régénérer : `openssl rand -hex 32`. La changer déconnecte les sessions existantes, sans autre conséquence à ce stade. |
+| `TMDB_READ_TOKEN` | themoviedb.org → Paramètres → API → « jeton d'accès en lecture » (auth v4). C'est le seul identifiant TMDB utilisé. Compte personnel de Geoffroy, pas lié à un employeur. |
+| `DATABASE_URL` | Tableau de bord Neon (console.neon.tech, compte personnel « Geoffroy », projet **SoireePopcorn**, région Frankfurt) → bouton « Connect » → copier la chaîne (de préférence la version *pooled*). La base et ses 10 131 films sont intacts, **indépendants de la machine utilisée** — confirmé le 9 septembre 2026 après un changement de machine (Mac professionnel quitté → Windows personnel) : reconnexion immédiate, aucune perte. |
+| `SESSION_SECRET` | À régénérer : `openssl rand -hex 32`. La changer déconnecte les sessions existantes, sans autre conséquence. |
 | `CRON_SECRET` | À régénérer de la même façon. |
 
-**Note pour Vercel :** au déploiement, ces quatre variables devront être déclarées dans les réglages du projet. L'intégration Neon peut injecter `DATABASE_URL` toute seule.
+**Note pour Vercel :** au déploiement, ces quatre variables devront être déclarées dans les réglages du projet. Le projet n'est **pas encore lié à Vercel** à ce jour (9 septembre 2026) — `vercel.json` existe (cron hebdomadaire d'ingestion) mais aucun déploiement n'a été fait. L'intégration Neon peut injecter `DATABASE_URL` toute seule une fois le projet importé sur Vercel.
 
 ---
 
@@ -137,10 +137,12 @@ Ce sont les pièges qui ont réellement coûté du temps, ou que les relectures 
 | Sujet | État |
 |---|---|
 | Garde de portabilité de `roomcode.ts` | C'est aujourd'hui une expression régulière sur le texte du fichier. Elle ne verrait pas une dépendance Node arrivant indirectement. Un vrai contrôle demanderait `esbuild` en dépendance de développement explicite — il n'est présent qu'en transitif. **Décision à prendre.** |
-| `pnpm build` comme preuve | Ne prouve rien tant qu'aucune route n'importe `lib/db/client.ts`. Devient une vraie garantie à la tâche 8. |
-| Sort de `lib/match.ts` | La règle de production sera le SQL. Le plan 2 prévoit une table de huit cas vérifiant que les deux sont d'accord, faute de quoi la fonction deviendrait décorative. |
+| Sort de `lib/match.ts` | La règle de production est le SQL (`shouldCreateMatch`) ; `lib/match.ts` reste la version TypeScript, vérifiée d'accord avec le SQL par une table de cas croisés en test. |
 | Couverture des tags | 41,5 % sur tout le catalogue, 89,4 % sur les 2 000 films les plus populaires. La cible initiale de 60 % était inatteignable : une partie de la longue traîne n'a aucun mot-clé chez TMDB. |
 | Forme du cron | Le script d'ingestion dure vingt minutes, bien au-delà de la durée maximale d'une fonction Vercel. La route de cron ne relance qu'un lot borné. |
+| **Prénom absent des réglages** (trou du plan 3, trouvé en revue finale) | La §7.6 de la spec et le plan lui-même demandent d'afficher le prénom dans `SettingsSheet`, mais aucune tâche n'exposait « qui suis-je » côté client : `/api/events` ne renvoie pas l'identité du membre courant, `MemberSummary` ne porte que `id`/`displayName` sans distinction. Pas bloquant (le prénom sert surtout à se relire soi-même), mais à corriger si un « plan 4 » voit le jour : il faudrait une nouvelle donnée serveur avant de pouvoir l'afficher. |
+| **Écran de récupération d'identité absent** (trou du plan 3, trouvé en revue finale) | La §11 de la spec prévoit qu'un membre qui a perdu son cookie (nouveau téléphone) puisse choisir son prénom dans une liste et reprendre son historique. Les routes serveur existent et sont testées (`membresDuSalon()`, `reprendreIdentite()` dans `lib/api-client.ts`), mais **aucun écran ne les appelle** — ce sont deux exports morts. Conséquence concrète : si le salon est déjà complet (cas normal, 2/2), la personne qui a perdu son cookie ne peut plus rejoindre son propre salon depuis l'interface. Aucune tâche du plan 3 ne couvrait cet écran ; candidat naturel pour un « plan 4 ». |
+| File d'attente de balayages hors-ligne absente (§11, trou du plan 3) | La spec prévoit que les balayages faits sans réseau s'empilent et soient rejoués au retour. L'implémentation actuelle est optimiste (la carte part avant la réponse serveur) mais un balayage perdu en cours de route est perdu — la gestion d'erreur ajoutée en revue finale évite au moins de casser l'état local (§5), sans rejouer la file. |
 
 ---
 
@@ -153,19 +155,19 @@ Le projet a été mené avec le plugin **superpowers**, et la méthode a réelle
 | Étape | Compétence | Quand |
 |---|---|---|
 | Cadrage | `superpowers:brainstorming` | Avant toute création. C'est elle qui a produit la spec. |
-| Rédaction du plan | `superpowers:writing-plans` | Pour écrire le plan 3, qui n'existe pas encore. |
-| Exécution | `superpowers:subagent-driven-development` | Un sous-agent neuf par tâche, relecture entre chaque. C'est la méthode utilisée pour les plans 1 et 2. |
-| Revue de fin de branche | `superpowers:requesting-code-review` | Sur le modèle le plus capable. C'est elle qui a trouvé le bug des plateformes. |
+| Rédaction du plan | `superpowers:writing-plans` | Utilisée pour écrire les plans 2 et 3, avec relecture obligatoire avant sauvegarde. |
+| Exécution | `superpowers:subagent-driven-development` | Un sous-agent neuf par tâche, relecture entre chaque. C'est la méthode utilisée pour les trois plans. |
+| Revue de fin de branche | `superpowers:requesting-code-review` | Sur le modèle le plus capable. C'est elle qui a trouvé le bug des plateformes (plan 1), l'atomicité de `joinRoom` (plan 2), et le contraste illisible + l'historique de match rejoué (plan 3) — trois bugs qu'aucune revue tâche par tâche ne pouvait voir. |
 | Clôture | `superpowers:finishing-a-development-branch` | Fusion, nettoyage. |
 | Débogage | `superpowers:systematic-debugging` | Devant tout comportement inattendu, avant de proposer un correctif. |
 
-### Pour le plan 3, qui est de l'interface
+### Compétences utiles pour un éventuel plan 4 (interface)
 
 | Compétence | Ce qu'elle apporte |
 |---|---|
-| `ui-ux-pro-max` | Base de styles, palettes, appariements de polices et piles techniques. Utile pour concrétiser les thèmes *Vidéo-club* et *Salle obscure*. |
+| `ui-ux-pro-max` | Base de styles, palettes, appariements de polices et piles techniques. |
 | `ui-styling` | Composants shadcn/ui, Tailwind, accessibilité, thèmes clair/sombre. |
-| `design-system` | Architecture des jetons de design — pertinent, puisque les deux thèmes reposent sur un seul jeu de variables CSS. |
+| `design-system` | Architecture des jetons de design — pertinent, puisque les deux thèmes reposent sur un seul jeu de variables CSS (16 jetons `--sp-*` au terme du plan 3). |
 
 ### Commandes ponctuelles
 
@@ -176,7 +178,7 @@ Le projet a été mené avec le plugin **superpowers**, et la méthode a réelle
 
 ### Reprise concrète
 
-Ouvrir le projet et dire, en substance : *« Reprends l'exécution du plan 2 à la tâche 2, avec subagent-driven-development. »* Le fichier `.superpowers/sdd/progress.md` contient le journal détaillé de tout ce qui a été fait, tâche par tâche, avec les constats de relecture — mais **il est ignoré par git**, donc il disparaît avec la machine. Le présent document et l'historique des commits en sont la trace durable.
+Les trois plans écrits sont terminés. Pour repartir, deux pistes naturelles : déployer sur Vercel (rien n'est encore lié, voir §3), ou écrire un plan 4 pour les deux trous du plan 3 listés au §6 (prénom dans les réglages, écran de récupération d'identité). Dans les deux cas, ouvrir le projet et dire, en substance : *« Regarde le HANDOVER, qu'est-ce qu'on fait ensuite ? »* Le fichier `.superpowers/sdd/<plan>/progress.md` de chaque plan contient le journal détaillé de tout ce qui a été fait, tâche par tâche, avec les constats de relecture — mais **il est ignoré par git**, donc il disparaît avec la machine. Le présent document et l'historique des commits en sont la trace durable.
 
 ---
 
@@ -184,8 +186,8 @@ Ouvrir le projet et dire, en substance : *« Reprends l'exécution du plan 2 à 
 
 | | |
 |---|---|
-| Commits | 28 |
-| Tests | 89, tous verts |
+| Commits | ~74 (main + les trois branches de plan) |
+| Tests | 227 (unitaires + intégration sur PGlite) + 2 e2e (Playwright, vraie base) |
 | Films en base | 10 131 |
 | Tables | 7 |
-| Tâches faites | 11 sur 22 planifiées (plans 1 et 2), plan 3 à écrire |
+| Tâches faites | 38 sur 38 planifiées (plans 1, 2 et 3, tous terminés) |
