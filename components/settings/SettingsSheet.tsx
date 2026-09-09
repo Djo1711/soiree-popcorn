@@ -49,7 +49,18 @@ export function SettingsSheet({
         }}
         onClick={(e) => e.stopPropagation()}
       >
-        <h2 className="mb-4 text-xl">Réglages</h2>
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="text-xl">Réglages</h2>
+          <button
+            type="button"
+            onClick={onFermer}
+            aria-label="Fermer"
+            className="h-11 w-11 rounded-full"
+            style={{ background: 'var(--sp-surface)' }}
+          >
+            ↓
+          </button>
+        </div>
 
         <fieldset className="mb-4">
           <legend className="sp-meta mb-2 text-sm">Thème</legend>

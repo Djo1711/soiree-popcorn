@@ -35,7 +35,7 @@
 }
 
 [data-theme='salle-obscure'][data-bg='3'] .sp-page {
-  background-image:
+  background:
     repeating-linear-gradient(
       45deg,
       rgba(237, 230, 218, 0.03) 0,

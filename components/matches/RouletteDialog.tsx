@@ -50,7 +50,7 @@ export function RouletteDialog({ ouverte, onFermer }: { ouverte: boolean; onFerm
   return (
     <div
       className="fixed inset-0 z-30 flex flex-col items-center justify-center gap-6 p-6"
-      style={{ background: 'rgba(0, 0, 0, 0.85)', color: 'var(--sp-ink)' }}
+      style={{ background: 'rgba(0, 0, 0, 0.85)', color: 'var(--sp-ink-page)' }}
     >
       <div className="relative h-72 w-48 overflow-hidden" style={{ borderRadius: 'var(--sp-radius-card)' }}>
         {gagnant && (

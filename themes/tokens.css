@@ -3,6 +3,7 @@
   --sp-bg-2: #1a1a1a;
   --sp-surface: #f5f5f5;
   --sp-ink: #1a1a1a;
+  --sp-ink-page: var(--sp-ink);
   --sp-ink-soft: #6b6b6b;
   --sp-accent: #e4572e;
   --sp-accent-ink: #1a0f0a;
@@ -29,7 +30,7 @@
 .sp-page {
   position: relative;
   background: var(--sp-bg);
-  color: var(--sp-ink);
+  color: var(--sp-ink-page);
   min-height: 100dvh;
 }
 

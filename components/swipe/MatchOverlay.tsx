@@ -16,7 +16,7 @@ export function MatchOverlay({
   return (
     <div
       className="sp-match-backdrop fixed inset-0 z-30 flex flex-col items-center justify-center gap-4 p-6 text-center"
-      style={{ background: 'rgba(0, 0, 0, 0.75)', color: 'var(--sp-ink)' }}
+      style={{ background: 'rgba(0, 0, 0, 0.75)', color: 'var(--sp-ink-page)' }}
     >
       <div
         className="sp-match-card relative w-48 overflow-hidden"

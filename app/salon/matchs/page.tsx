@@ -1,8 +1,10 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { changerStatutMatch, listerMatchs } from '@/lib/api-client'
+import { useRoomEvents } from '@/lib/use-room-events'
 import { MatchGrid } from '@/components/matches/MatchGrid'
 import { RouletteDialog } from '@/components/matches/RouletteDialog'
 import type { MatchRow } from '@/lib/db/queries/matches'
@@ -15,12 +17,20 @@ const ONGLETS: { statut: MatchStatus; libelle: string }[] = [
 ]
 
 export default function PageMatchs() {
+  const router = useRouter()
+  const evenementsSalon = useRoomEvents()
   const [statut, setStatut] = useState<MatchStatus>('a_voir')
   const [matchs, setMatchs] = useState<MatchRow[]>([])
   const [rouletteOuverte, setRouletteOuverte] = useState(false)
 
   useEffect(() => {
-    listerMatchs(statut).then(({ matches }) => setMatchs(matches))
+    if (evenementsSalon.sansSession) router.replace('/')
+  }, [evenementsSalon.sansSession, router])
+
+  useEffect(() => {
+    listerMatchs(statut)
+      .then(({ matches }) => setMatchs(matches))
+      .catch(() => {})
   }, [statut])
 
   async function changerStatut(movieId: number, nouveauStatut: MatchStatus) {
@@ -29,7 +39,7 @@ export default function PageMatchs() {
   }
 
   return (
-    <main className="sp-page min-h-dvh">
+    <main className="min-h-dvh">
       <header className="flex items-center justify-between p-4">
         <Link href="/salon" className="min-h-11">
           ← Retour
@@ -50,7 +60,7 @@ export default function PageMatchs() {
             style={{
               borderRadius: 'var(--sp-radius-pill)',
               background: statut === s ? 'var(--sp-accent)' : 'transparent',
-              color: statut === s ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
+              color: statut === s ? 'var(--sp-accent-ink)' : 'var(--sp-ink-page)',
             }}
           >
             {libelle}

@@ -3,6 +3,7 @@
   --sp-bg-2: #eadfc3;
   --sp-surface: #f3e9d2;
   --sp-ink: #1b140c;
+  --sp-ink-page: var(--sp-surface);
   --sp-ink-soft: #6b5a3e;
   --sp-accent: #e4572e;
   --sp-accent-ink: #1b0d08;
@@ -25,7 +26,7 @@
 }
 
 [data-theme='videoclub'][data-bg='3'] .sp-page {
-  background-image:
+  background:
     repeating-linear-gradient(
       to bottom,
       rgba(243, 233, 210, 0.04) 0,

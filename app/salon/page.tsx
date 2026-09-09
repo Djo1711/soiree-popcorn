@@ -25,13 +25,15 @@ export default function EcranBalayage() {
   const [filtresOuverts, setFiltresOuverts] = useState(false)
   const [reglagesOuverts, setReglagesOuverts] = useState(false)
   const [matchAffiche, setMatchAffiche] = useState<MatchRow | null>(null)
-  const [dernierMatchVu, setDernierMatchVu] = useState(0)
+  const [dernierMatchVu, setDernierMatchVu] = useState<number | null>(null)
 
   const rechargerPaquet = useCallback(() => {
-    paquet(20).then(({ cards, message }) => {
-      setCartes(cards)
-      setMessageVide(message ?? null)
-    })
+    paquet(20)
+      .then(({ cards, message }) => {
+        setCartes(cards)
+        setMessageVide(message ?? null)
+      })
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -43,26 +45,51 @@ export default function EcranBalayage() {
   }, [evenementsSalon.sansSession, router])
 
   useEffect(() => {
+    if (dernierMatchVu === null) {
+      if (!evenementsSalon.pretAffiche) return
+      // Premier cycle : n'afficher aucun match déjà existant, seulement les nouveaux à venir.
+      const maxConnu = evenementsSalon.matches.reduce((max, m) => Math.max(max, m.matchId), 0)
+      setDernierMatchVu(maxConnu)
+      return
+    }
     const nouveau = evenementsSalon.matches.find((m) => m.matchId > dernierMatchVu)
     if (nouveau) {
       setMatchAffiche(nouveau)
       setDernierMatchVu(nouveau.matchId)
     }
-  }, [evenementsSalon.matches, dernierMatchVu])
+  }, [evenementsSalon.matches, evenementsSalon.pretAffiche, dernierMatchVu])
 
   async function traiterBalayage(id: number, sens: 'aime' | 'rejette') {
+    const carte = cartes.find((c) => c.id === id)
     setCartes((precedent) => precedent.filter((c) => c.id !== id))
     setDernierBalaye(id)
-    await balayer(id, sens === 'aime')
+    const { match } = await balayer(id, sens === 'aime')
+    if (match && carte) {
+      setDernierBalaye(null) // un balayage ayant créé un match n'est plus annulable (§6)
+      setDernierMatchVu((precedent) => (precedent === null || match.matchId > precedent ? match.matchId : precedent))
+      setMatchAffiche(
+        (precedent) =>
+          precedent ?? {
+            matchId: match.matchId,
+            status: 'a_voir',
+            createdAt: new Date().toISOString(),
+            movie: carte,
+          },
+      )
+    }
     if (cartes.length <= 3) rechargerPaquet()
   }
 
   async function rembobiner() {
     if (dernierBalaye === null) return
-    const { movieId } = await annulerDernierBalayage()
-    setDernierBalaye(null)
-    rechargerPaquet()
-    void movieId
+    try {
+      const { movieId } = await annulerDernierBalayage()
+      setDernierBalaye(null)
+      rechargerPaquet()
+      void movieId
+    } catch {
+      setDernierBalaye(null)
+    }
   }
 
   const carteHaut = cartes[0]
@@ -76,7 +103,7 @@ export default function EcranBalayage() {
   }, [carteHaut])
 
   return (
-    <main className="sp-page flex min-h-dvh flex-col">
+    <main className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between p-4">
         <span className="sp-meta" style={{ color: 'var(--sp-ink-soft)' }}>
           {evenementsSalon.room?.code ?? '……'}
@@ -97,7 +124,7 @@ export default function EcranBalayage() {
         >
           ⚙︎
         </button>
-        <Link href="/salon/matchs" className="sp-meta">
+        <Link href="/salon/matchs" className="sp-meta min-h-11 flex items-center">
           {evenementsSalon.matches.length} match{evenementsSalon.matches.length > 1 ? 's' : ''}
         </Link>
       </header>
