@@ -87,7 +87,7 @@ export function RouletteDialog({ ouverte, onFermer }: { ouverte: boolean; onFerm
               type="button"
               onClick={() => setTentative((t) => t + 1)}
               className="min-h-11 rounded-[var(--sp-radius-pill)] border px-4"
-              style={{ borderColor: 'var(--sp-ink-soft)' }}
+              style={{ borderColor: 'var(--sp-ink-page-soft)' }}
             >
               Relancer
             </button>
