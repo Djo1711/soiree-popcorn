@@ -76,7 +76,7 @@ export default function Home() {
           Créer un salon
         </button>
         <button
-          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)] px-6 py-3"
+          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-6 py-3"
           onClick={() => setMode('rejoindre')}
         >
           Rejoindre
@@ -93,7 +93,7 @@ export default function Home() {
           <label className="flex flex-col gap-1">
             Ton prénom
             <input
-              className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)] px-4"
+              className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4"
               value={prenom}
               onChange={(e) => setPrenom(e.target.value)}
               maxLength={30}
@@ -158,7 +158,7 @@ export default function Home() {
             setTimeout(() => setCopie(false), 1500)
           }}
           className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-6 py-3"
-          style={{ borderColor: 'var(--sp-ink-soft)' }}
+          style={{ borderColor: 'var(--sp-ink-page-soft)' }}
         >
           {copie ? 'Lien copié !' : 'Copier le lien à partager'}
         </button>
@@ -180,7 +180,7 @@ export default function Home() {
         <label className="flex flex-col gap-1">
           Code du salon
           <input
-            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)] px-4 uppercase"
+            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4 uppercase"
             value={code}
             onChange={(e) => setCode(e.target.value)}
             required
@@ -189,7 +189,7 @@ export default function Home() {
         <label className="flex flex-col gap-1">
           Ton prénom
           <input
-            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)] px-4"
+            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4"
             value={prenom}
             onChange={(e) => setPrenom(e.target.value)}
             required

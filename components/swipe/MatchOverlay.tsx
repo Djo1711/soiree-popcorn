@@ -60,7 +60,7 @@ export function MatchOverlay({
           type="button"
           onClick={onFermer}
           className="min-h-11 rounded-[var(--sp-radius-pill)] border"
-          style={{ borderColor: 'var(--sp-ink-soft)' }}
+          style={{ borderColor: 'var(--sp-ink-page-soft)' }}
         >
           Continuer
         </button>

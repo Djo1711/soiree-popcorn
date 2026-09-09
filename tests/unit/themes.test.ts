@@ -6,7 +6,9 @@ const VARIABLES = [
   '--sp-bg-2',
   '--sp-surface',
   '--sp-ink',
+  '--sp-ink-page',
   '--sp-ink-soft',
+  '--sp-ink-page-soft',
   '--sp-accent',
   '--sp-accent-ink',
   '--sp-danger',
@@ -19,7 +21,7 @@ const VARIABLES = [
 ]
 
 describe('thèmes', () => {
-  it('tokens.css déclare les 14 variables avec une valeur de secours', () => {
+  it('tokens.css déclare les 16 variables avec une valeur de secours', () => {
     const source = readFileSync('themes/tokens.css', 'utf8')
     for (const variable of VARIABLES) {
       expect(source, `${variable} absent de tokens.css`).toMatch(
@@ -28,7 +30,7 @@ describe('thèmes', () => {
     }
   })
 
-  it('videoclub.css redéfinit les 14 variables', () => {
+  it('videoclub.css redéfinit les 16 variables', () => {
     const source = readFileSync('themes/videoclub.css', 'utf8')
     expect(source).toMatch(/\[data-theme=['"]videoclub['"]\]/)
     for (const variable of VARIABLES) {
@@ -38,7 +40,7 @@ describe('thèmes', () => {
     }
   })
 
-  it('salle-obscure.css redéfinit les 14 variables', () => {
+  it('salle-obscure.css redéfinit les 16 variables', () => {
     const source = readFileSync('themes/salle-obscure.css', 'utf8')
     expect(source).toMatch(/\[data-theme=['"]salle-obscure['"]\]/)
     for (const variable of VARIABLES) {

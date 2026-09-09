@@ -40,7 +40,7 @@ export default function AdhesionParLien({ params }: { params: Promise<{ code: st
         <label className="flex flex-col gap-1">
           Ton prénom
           <input
-            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)] px-4"
+            className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4"
             value={prenom}
             onChange={(e) => setPrenom(e.target.value)}
             disabled={!valide}

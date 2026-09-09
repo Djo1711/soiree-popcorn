@@ -5,6 +5,7 @@
   --sp-ink: #1a1a1a;
   --sp-ink-page: var(--sp-ink);
   --sp-ink-soft: #6b6b6b;
+  --sp-ink-page-soft: var(--sp-ink-soft);
   --sp-accent: #e4572e;
   --sp-accent-ink: #1a0f0a;
   --sp-danger: #b3261e;

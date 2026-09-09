@@ -3,7 +3,9 @@
   --sp-bg-2: #1e1a15;
   --sp-surface: #201b16;
   --sp-ink: #ede6da;
+  --sp-ink-page: var(--sp-ink);
   --sp-ink-soft: #a89c87;
+  --sp-ink-page-soft: var(--sp-ink-soft);
   --sp-accent: #c9a227;
   --sp-accent-ink: #14110e;
   --sp-danger: #9a2a2a;

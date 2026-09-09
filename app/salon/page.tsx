@@ -63,21 +63,29 @@ export default function EcranBalayage() {
     const carte = cartes.find((c) => c.id === id)
     setCartes((precedent) => precedent.filter((c) => c.id !== id))
     setDernierBalaye(id)
-    const { match } = await balayer(id, sens === 'aime')
-    if (match && carte) {
-      setDernierBalaye(null) // un balayage ayant créé un match n'est plus annulable (§6)
-      setDernierMatchVu((precedent) => (precedent === null || match.matchId > precedent ? match.matchId : precedent))
-      setMatchAffiche(
-        (precedent) =>
-          precedent ?? {
-            matchId: match.matchId,
-            status: 'a_voir',
-            createdAt: new Date().toISOString(),
-            movie: carte,
-          },
-      )
+    try {
+      const { match } = await balayer(id, sens === 'aime')
+      if (match && carte) {
+        setDernierBalaye(null) // un balayage ayant créé un match n'est plus annulable (§6)
+        setDernierMatchVu((precedent) => (precedent === null || match.matchId > precedent ? match.matchId : precedent))
+        setMatchAffiche(
+          (precedent) =>
+            precedent ?? {
+              matchId: match.matchId,
+              status: 'a_voir',
+              createdAt: new Date().toISOString(),
+              movie: carte,
+            },
+        )
+      }
+      if (cartes.length <= 3) rechargerPaquet()
+    } catch {
+      // Le balayage n'a pas été enregistré côté serveur : recharger le paquet
+      // depuis la vraie base plutôt que de laisser « rembobiner » viser un
+      // balayage fantôme.
+      setDernierBalaye(null)
+      rechargerPaquet()
     }
-    if (cartes.length <= 3) rechargerPaquet()
   }
 
   async function rembobiner() {
@@ -105,7 +113,7 @@ export default function EcranBalayage() {
   return (
     <main className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between p-4">
-        <span className="sp-meta" style={{ color: 'var(--sp-ink-soft)' }}>
+        <span className="sp-meta" style={{ color: 'var(--sp-ink-page-soft)' }}>
           {evenementsSalon.room?.code ?? '……'}
         </span>
         <button

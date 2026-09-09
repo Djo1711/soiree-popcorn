@@ -34,8 +34,12 @@ export default function PageMatchs() {
   }, [statut])
 
   async function changerStatut(movieId: number, nouveauStatut: MatchStatus) {
-    await changerStatutMatch(movieId, nouveauStatut)
-    setMatchs((precedent) => precedent.filter((m) => m.movie.id !== movieId))
+    try {
+      await changerStatutMatch(movieId, nouveauStatut)
+      setMatchs((precedent) => precedent.filter((m) => m.movie.id !== movieId))
+    } catch {
+      // Rien à faire : la vignette reste affichée avec son statut réel côté serveur.
+    }
   }
 
   return (
