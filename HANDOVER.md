@@ -64,11 +64,11 @@ Dix-sept tâches, toutes relues, plus une revue finale de branche et deux rounds
 - PWA installable (manifeste, icône), cron de déploiement Vercel.
 - Test Playwright à deux navigateurs (`tests/e2e/`), contre une vraie base Postgres — c'est la seule partie de la suite qui a besoin d'un `DATABASE_URL` réel plutôt que PGlite.
 
-**Tests :** 227, tous verts (unitaires + intégration sur PGlite) + 2 tests e2e (Playwright, contre une vraie base).
+**Tests :** 240, tous verts (unitaires + intégration sur PGlite) + 2 tests e2e (Playwright, contre une vraie base).
 
 ### À faire — rien de planifié
 
-Les trois plans prévus sont terminés. Le §6 liste deux trous du plan 3 découverts en revue finale (prénom absent des réglages, écran de récupération d'identité) qui n'ont jamais été assignés à une tâche — candidats naturels pour un éventuel « plan 4 » si le besoin s'en fait sentir, mais rien n'est bloquant pour un usage normal.
+Les trois plans prévus sont terminés. Deux trous du plan 3 découverts en revue finale (prénom absent des réglages, écran de récupération d'identité) ont été comblés le 11 septembre 2026, hors plan formel — voir §6. Il ne reste que la file d'attente de balayages hors-ligne (§11 de la spec), volontairement pas traitée dans la même passe : candidate pour un éventuel « plan 4 » si le besoin s'en fait sentir, mais rien n'est bloquant pour un usage normal.
 
 ---
 
@@ -79,7 +79,7 @@ git clone git@github.com:Djo1711/soiree-popcorn.git
 cd soiree-popcorn
 pnpm install
 cp .env.example .env.local   # puis remplir, voir ci-dessous
-pnpm test                    # doit afficher 227 passed
+pnpm test                    # doit afficher 240 passed
 ```
 
 ### Les secrets, qui ne sont pas dans le dépôt
@@ -151,9 +151,9 @@ Ce sont les pièges qui ont réellement coûté du temps, ou que les relectures 
 | Sort de `lib/match.ts` | La règle de production est le SQL (`shouldCreateMatch`) ; `lib/match.ts` reste la version TypeScript, vérifiée d'accord avec le SQL par une table de cas croisés en test. |
 | Couverture des tags | 41,5 % sur tout le catalogue, 89,4 % sur les 2 000 films les plus populaires. La cible initiale de 60 % était inatteignable : une partie de la longue traîne n'a aucun mot-clé chez TMDB. |
 | Forme du cron | Le script d'ingestion dure vingt minutes, bien au-delà de la durée maximale d'une fonction Vercel. La route de cron ne relance qu'un lot borné. |
-| **Prénom absent des réglages** (trou du plan 3, trouvé en revue finale) | La §7.6 de la spec et le plan lui-même demandent d'afficher le prénom dans `SettingsSheet`, mais aucune tâche n'exposait « qui suis-je » côté client : `/api/events` ne renvoie pas l'identité du membre courant, `MemberSummary` ne porte que `id`/`displayName` sans distinction. Pas bloquant (le prénom sert surtout à se relire soi-même), mais à corriger si un « plan 4 » voit le jour : il faudrait une nouvelle donnée serveur avant de pouvoir l'afficher. |
-| **Écran de récupération d'identité absent** (trou du plan 3, trouvé en revue finale) | La §11 de la spec prévoit qu'un membre qui a perdu son cookie (nouveau téléphone) puisse choisir son prénom dans une liste et reprendre son historique. Les routes serveur existent et sont testées (`membresDuSalon()`, `reprendreIdentite()` dans `lib/api-client.ts`), mais **aucun écran ne les appelle** — ce sont deux exports morts. Conséquence concrète : si le salon est déjà complet (cas normal, 2/2), la personne qui a perdu son cookie ne peut plus rejoindre son propre salon depuis l'interface. Aucune tâche du plan 3 ne couvrait cet écran ; candidat naturel pour un « plan 4 ». |
-| File d'attente de balayages hors-ligne absente (§11, trou du plan 3) | La spec prévoit que les balayages faits sans réseau s'empilent et soient rejoués au retour. L'implémentation actuelle est optimiste (la carte part avant la réponse serveur) mais un balayage perdu en cours de route est perdu — la gestion d'erreur ajoutée en revue finale évite au moins de casser l'état local (§5), sans rejouer la file. |
+| ~~Prénom absent des réglages~~ | **Résolu le 11 septembre 2026.** `/api/events` renvoie désormais `moi` (le membre courant, déduit du `memberId` de la session), affiché dans `SettingsSheet`. |
+| ~~Écran de récupération d'identité absent~~ | **Résolu le 11 septembre 2026.** `app/j/[code]/page.tsx` propose de reprendre une identité existante quand l'adhésion échoue — les deux routes existantes (`membresDuSalon()`, `reprendreIdentite()`) ne sont plus des exports morts. |
+| File d'attente de balayages hors-ligne absente (§11, trou du plan 3) | La spec prévoit que les balayages faits sans réseau s'empilent et soient rejoués au retour. L'implémentation actuelle est optimiste (la carte part avant la réponse serveur) mais un balayage perdu en cours de route est perdu — la gestion d'erreur ajoutée en revue finale évite au moins de casser l'état local (§5), sans rejouer la file. **Volontairement pas traité le 11 septembre 2026** avec les deux points ci-dessus : rejouer une file fiable demande de repenser `traiterBalayage` (app/salon/page.tsx) en profondeur et de le tester en conditions hors-ligne réelles, plus risqué à improviser qu'à planifier. |
 
 ---
 
@@ -198,7 +198,7 @@ Les trois plans écrits sont terminés. Pour repartir, deux pistes naturelles : 
 | | |
 |---|---|
 | Commits | ~74 (main + les trois branches de plan) |
-| Tests | 227 (unitaires + intégration sur PGlite) + 2 e2e (Playwright, vraie base) |
+| Tests | 240 (unitaires + intégration sur PGlite) + 2 e2e (Playwright, vraie base) |
 | Films en base | 10 131 |
 | Tables | 7 |
 | Tâches faites | 38 sur 38 planifiées (plans 1, 2 et 3, tous terminés) |
