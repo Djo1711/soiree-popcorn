@@ -8,6 +8,7 @@ export interface EtatSalon {
   curseur: number
   pretAffiche: boolean
   sansSession: boolean
+  moi: MemberSummary | null
 }
 
 export const ETAT_INITIAL: EtatSalon = {
@@ -17,11 +18,12 @@ export const ETAT_INITIAL: EtatSalon = {
   curseur: 0,
   pretAffiche: false,
   sansSession: false,
+  moi: null,
 }
 
 export function fusionnerEvenements(
   etat: EtatSalon,
-  reponse: { room: RoomSummary; members: MemberSummary[]; matches: MatchRow[] },
+  reponse: { room: RoomSummary; members: MemberSummary[]; matches: MatchRow[]; moi: MemberSummary | null },
 ): EtatSalon {
   const curseur = reponse.matches.reduce((max, m) => Math.max(max, m.matchId), etat.curseur)
   return {
@@ -31,5 +33,6 @@ export function fusionnerEvenements(
     curseur,
     pretAffiche: true,
     sansSession: false,
+    moi: reponse.moi,
   }
 }

@@ -86,7 +86,12 @@ export function annulerDernierBalayage(): Promise<{ movieId: number }> {
 
 export function evenements(
   since: number,
-): Promise<{ room: RoomSummary; members: MemberSummary[]; matches: MatchRow[] }> {
+): Promise<{
+  room: RoomSummary
+  members: MemberSummary[]
+  matches: MatchRow[]
+  moi: MemberSummary | null
+}> {
   return appeler(`/api/events?since=${since}`)
 }
 

@@ -44,6 +44,7 @@ describe("fusionnerEvenements", () => {
       room: salon,
       members: [],
       matches: [match(1)],
+      moi: null,
     })
     expect(premier.matches.map((m) => m.matchId)).toEqual([1])
     expect(premier.curseur).toBe(1)
@@ -52,6 +53,7 @@ describe("fusionnerEvenements", () => {
       room: salon,
       members: [],
       matches: [match(2), match(3)],
+      moi: null,
     })
     expect(second.matches.map((m) => m.matchId)).toEqual([1, 2, 3])
     expect(second.curseur).toBe(3)
@@ -62,21 +64,34 @@ describe("fusionnerEvenements", () => {
       room: salon,
       members: [],
       matches: [match(5)],
+      moi: null,
     })
-    const vide = fusionnerEvenements(premier, { room: salon, members: [], matches: [] })
+    const vide = fusionnerEvenements(premier, { room: salon, members: [], matches: [], moi: null })
     expect(vide.curseur).toBe(5)
     expect(vide.matches).toHaveLength(1)
   })
 
   it("marque prêt après le premier événement reçu", () => {
     expect(ETAT_INITIAL.pretAffiche).toBe(false)
-    const apres = fusionnerEvenements(ETAT_INITIAL, { room: salon, members: [], matches: [] })
+    const apres = fusionnerEvenements(ETAT_INITIAL, { room: salon, members: [], matches: [], moi: null })
     expect(apres.pretAffiche).toBe(true)
   })
 
   it("remet sansSession à false à chaque événement reçu", () => {
     const enErreur = { ...ETAT_INITIAL, sansSession: true }
-    const apres = fusionnerEvenements(enErreur, { room: salon, members: [], matches: [] })
+    const apres = fusionnerEvenements(enErreur, { room: salon, members: [], matches: [], moi: null })
     expect(apres.sansSession).toBe(false)
+  })
+
+  it('porte « moi » du dernier événement reçu, pour que les réglages sachent quel membre afficher', () => {
+    expect(ETAT_INITIAL.moi).toBeNull()
+    const djo = { id: 'm1', displayName: 'Djo' }
+    const apres = fusionnerEvenements(ETAT_INITIAL, {
+      room: salon,
+      members: [djo],
+      matches: [],
+      moi: djo,
+    })
+    expect(apres.moi).toEqual(djo)
   })
 })

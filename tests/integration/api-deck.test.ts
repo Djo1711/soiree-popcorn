@@ -90,6 +90,17 @@ describe('POST /api/swipes puis GET /api/events', () => {
     expect(room.complete).toBe(true)
   })
 
+  it('renvoie « moi » d’après la session, pas d’après l’ordre d’arrivée dans le salon', async () => {
+    const { djo, alice } = await salonDeDeux()
+    const { GET: evenements } = await import('@/app/api/events/route')
+
+    const reponseDjo = await evenements(new Request('http://x/api/events?since=0', { headers: { cookie: djo } }))
+    expect((await reponseDjo.json()).moi.displayName).toBe('Djo')
+
+    const reponseAlice = await evenements(new Request('http://x/api/events?since=0', { headers: { cookie: alice } }))
+    expect((await reponseAlice.json()).moi.displayName).toBe('Alice')
+  })
+
   it('refuse un identifiant de film qui n’existe pas', async () => {
     const { djo } = await salonDeDeux()
     const { POST } = await import('@/app/api/swipes/route')

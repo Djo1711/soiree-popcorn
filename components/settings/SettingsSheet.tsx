@@ -16,11 +16,13 @@ export function SettingsSheet({
   ouverte,
   onFermer,
   code,
+  prenom,
   lien,
 }: {
   ouverte: boolean
   onFermer: () => void
   code: string
+  prenom: string
   lien: string
 }) {
   const router = useRouter()
@@ -107,6 +109,7 @@ export function SettingsSheet({
 
         <fieldset className="mb-4">
           <legend className="sp-meta mb-2 text-sm">Salon</legend>
+          {prenom && <p className="sp-meta mb-2">Prénom : {prenom}</p>}
           <p className="sp-meta mb-2">Code : {code}</p>
           <button
             type="button"

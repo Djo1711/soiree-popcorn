@@ -3,6 +3,7 @@ import { exigerMembre } from '@/lib/api/guard'
 import { getDb } from '@/lib/db/client'
 import { fetchDeck } from '@/lib/db/queries/deck'
 import { getFilters } from '@/lib/db/queries/filters'
+import { resumeFiltresActifs } from '@/lib/deck-filters-summary'
 
 const LIMITE_PAR_DEFAUT = 20
 const LIMITE_MAX = 50
@@ -18,7 +19,15 @@ export async function GET(request: Request): Promise<Response> {
     const db = getDb()
     const filtres = await getFilters(db, session.memberId)
     const cards = await fetchDeck(db, session.roomCode, session.memberId, filtres, limite)
-    if (cards.length === 0) return ok({ cards, message: 'Plus aucun film ne correspond à vos filtres.' })
+    if (cards.length === 0) {
+      const resume = resumeFiltresActifs(filtres)
+      return ok({
+        cards,
+        message: resume
+          ? `Plus aucun film ne correspond à vos filtres actifs (${resume}).`
+          : 'Plus aucun film ne correspond à vos filtres.',
+      })
+    }
     return ok({ cards })
   })
 }

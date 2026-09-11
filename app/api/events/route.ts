@@ -14,10 +14,16 @@ export async function GET(request: Request): Promise<Response> {
     const room = await getRoom(db, session.roomCode)
     if (!room) return erreur(404, 'Ce salon n’existe plus.')
 
+    const members = await listMembers(db, session.roomCode)
+
     return ok({
       room,
-      members: await listMembers(db, session.roomCode),
+      members,
       matches: await matchesSince(db, session.roomCode, since),
+      // §7.6 : les réglages affichent le prénom du membre courant. Le
+      // cookie ne porte que son identifiant, jamais son prénom — le
+      // client n'a aucun autre moyen de savoir lequel des membres c'est lui.
+      moi: members.find((m) => m.id === session.memberId) ?? null,
     })
   })
 }

@@ -189,6 +189,7 @@ export default function EcranBalayage() {
         ouverte={reglagesOuverts}
         onFermer={() => setReglagesOuverts(false)}
         code={evenementsSalon.room?.code ?? ''}
+        prenom={evenementsSalon.moi?.displayName ?? ''}
         lien={
           typeof window !== 'undefined' && evenementsSalon.room
             ? `${window.location.origin}/j/${evenementsSalon.room.code}`
