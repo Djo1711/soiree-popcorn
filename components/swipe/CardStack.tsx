@@ -37,6 +37,11 @@ export function CardStack({
               key={film.id}
               film={film}
               position={POSITIONS_PILE[index]}
+              // Légère rotation des cartes empilées derrière, purement
+              // décorative (la carte du dessus reste toujours droite au repos) :
+              // ça donne du relief à la pile sans toucher aux seuils de geste
+              // testés dans lib/swipe-gesture.ts.
+              rotationStatique={index === 1 ? -4 : index === 2 ? 4 : 0}
               interactive={index === 0}
               onBalayage={onBalayage}
               onDetail={onDetail}
@@ -51,12 +56,14 @@ export function CardStack({
 function CarteDeplacable({
   film,
   position,
+  rotationStatique,
   interactive,
   onBalayage,
   onDetail,
 }: {
   film: DeckCard
   position: (typeof POSITIONS_PILE)[number]
+  rotationStatique: number
   interactive: boolean
   onBalayage: (id: number, sens: 'aime' | 'rejette') => void
   onDetail: (id: number) => void
@@ -73,12 +80,24 @@ function CarteDeplacable({
   // toute façon), seules l'apparition/sortie perdent leur mouvement physique.
   const reduit = useReducedMotion()
 
+  // Rotation décorative des cartes derrière la pile, distincte de la rotation
+  // interactive au glissement (`rotation` ci-dessus) : ne touche jamais la
+  // carte du dessus, pour ne pas interférer avec initial/animate déjà
+  // vérifiés là où le geste se joue.
+  const transformStatique = interactive
+    ? { scale: reduit ? 1 : position.echelle, y: reduit ? 0 : position.decalageY }
+    : {
+        scale: reduit ? 1 : position.echelle,
+        y: reduit ? 0 : position.decalageY,
+        rotate: reduit ? 0 : rotationStatique,
+      }
+
   return (
     <motion.div
       className="absolute inset-0"
       style={interactive ? { x, rotate: reduit ? 0 : rotation } : undefined}
-      initial={{ scale: reduit ? 1 : position.echelle, y: reduit ? 0 : position.decalageY, opacity: 0 }}
-      animate={{ scale: reduit ? 1 : position.echelle, y: reduit ? 0 : position.decalageY, opacity: 1 }}
+      initial={{ ...transformStatique, opacity: 0 }}
+      animate={{ ...transformStatique, opacity: 1 }}
       exit={
         reduit
           ? { opacity: 0 }

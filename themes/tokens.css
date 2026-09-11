@@ -58,3 +58,94 @@
   outline: 3px solid var(--sp-accent);
   outline-offset: 2px;
 }
+
+/* Direction « vivant & tactile » (accueil, balayage, superposition de match) :
+   trois primitives d'animation partagées, posées via classe + délai en
+   variable inline (--sp-enter-delay), plutôt que redéfinies par écran. */
+@keyframes sp-rise-fade {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes sp-pop-in {
+  from {
+    opacity: 0;
+    transform: scale(0.7);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes sp-floaty {
+  0%,
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+  50% {
+    transform: translateY(-9px) rotate(8deg);
+  }
+}
+
+@keyframes sp-pulse-glow {
+  0%,
+  100% {
+    box-shadow: var(--sp-pulse-shadow-a);
+  }
+  50% {
+    box-shadow: var(--sp-pulse-shadow-b);
+  }
+}
+
+.sp-enter {
+  animation: sp-rise-fade 700ms cubic-bezier(0.34, 1.2, 0.64, 1) both;
+  animation-delay: var(--sp-enter-delay, 0ms);
+}
+
+.sp-enter-pop {
+  animation: sp-pop-in 550ms cubic-bezier(0.34, 1.56, 0.64, 1) both;
+  animation-delay: var(--sp-enter-delay, 0ms);
+}
+
+/* Accent décoratif flottant (émoji) — purement visuel, toujours aria-hidden
+   côté composant. */
+.sp-floaty {
+  display: inline-block;
+  animation: sp-floaty 3.6s ease-in-out infinite;
+  animation-delay: var(--sp-enter-delay, 0ms);
+}
+
+/* Retour tactile au clic, partagé par tous les boutons « vivants » : la
+   pression physique reste une réponse à l'interaction, pas une animation
+   ambiante — elle n'est donc pas coupée sous prefers-reduced-motion (même
+   logique que le geste de balayage, déjà justifiée ailleurs dans ce fichier). */
+.sp-tactile {
+  transition: transform 120ms ease;
+}
+
+.sp-tactile:active {
+  transform: scale(0.94);
+}
+
+.sp-pulse {
+  animation: sp-pulse-glow 2.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sp-enter,
+  .sp-enter-pop {
+    animation: sp-fade 120ms ease-out both;
+  }
+
+  .sp-floaty,
+  .sp-pulse {
+    animation: none;
+  }
+}

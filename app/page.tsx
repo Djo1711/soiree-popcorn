@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ApiClientError, creerSalon, evenements, rejoindreSalon } from '@/lib/api-client'
+import { enterDelay } from '@/lib/entrance'
 import { MAX_MEMBERS, MIN_MEMBERS } from '@/lib/match'
 
 type Mode = 'verification' | 'accueil' | 'creer' | 'rejoindre' | 'partage'
@@ -65,18 +66,61 @@ export default function Home() {
 
   if (mode === 'accueil') {
     return (
-      <main className="mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-6 p-6">
-        <h1 style={{ fontFamily: 'var(--sp-font-display)' }} className="text-3xl">
+      <main className="relative mx-auto flex min-h-dvh max-w-sm flex-col items-center justify-center gap-3 overflow-hidden p-6">
+        <span
+          className="sp-floaty pointer-events-none absolute text-2xl"
+          style={{ top: '16%', left: '10%', ...enterDelay('0s') }}
+          aria-hidden="true"
+        >
+          🍿
+        </span>
+        <span
+          className="sp-floaty pointer-events-none absolute text-2xl"
+          style={{ top: '20%', right: '10%', ...enterDelay('1.3s') }}
+          aria-hidden="true"
+        >
+          🎬
+        </span>
+        <span
+          className="sp-meta sp-enter-pop mb-3"
+          style={{
+            ...enterDelay('250ms'),
+            background: 'var(--sp-surface)',
+            color: 'var(--sp-ink)',
+            padding: '4px 12px',
+            borderRadius: 'var(--sp-radius-pill)',
+            transform: 'rotate(-3deg)',
+            fontSize: '11px',
+            boxShadow: '0 4px 10px -4px rgba(0, 0, 0, 0.3)',
+          }}
+        >
+          2 à 8 personnes
+        </span>
+        <h1
+          style={{ fontFamily: 'var(--sp-font-display)', ...enterDelay('0ms') }}
+          className="sp-enter text-3xl"
+        >
           Soirée Popcorn
         </h1>
+        <p className="sp-meta sp-enter mb-3" style={{ ...enterDelay('120ms'), color: 'var(--sp-ink-page-soft)' }}>
+          on choisit, ensemble
+        </p>
         <button
-          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)]"
+          className="sp-tactile sp-enter min-h-11 w-full rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)]"
+          style={{
+            ...enterDelay('260ms'),
+            boxShadow: '0 5px 0 color-mix(in srgb, var(--sp-accent) 65%, black)',
+          }}
           onClick={() => setMode('creer')}
         >
           Créer un salon
         </button>
         <button
-          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-6 py-3"
+          className="sp-tactile sp-enter min-h-11 w-full rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-6 py-3"
+          style={{
+            ...enterDelay('360ms'),
+            boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-page-soft) 65%, black)',
+          }}
           onClick={() => setMode('rejoindre')}
         >
           Rejoindre

@@ -113,14 +113,23 @@ export default function EcranBalayage() {
   return (
     <main className="flex min-h-dvh flex-col">
       <header className="flex items-center justify-between p-4">
-        <span className="sp-meta" style={{ color: 'var(--sp-ink-page-soft)' }}>
+        <span
+          className="sp-meta"
+          style={{
+            color: 'var(--sp-ink-page-soft)',
+            padding: '6px 10px',
+            borderRadius: 'var(--sp-radius-pill)',
+            background: 'color-mix(in srgb, var(--sp-ink-page) 8%, transparent)',
+          }}
+        >
           {evenementsSalon.room?.code ?? '……'}
         </span>
         <button
           type="button"
           aria-label="Filtres"
           onClick={() => setFiltresOuverts(true)}
-          className="min-h-11 px-3"
+          className="sp-tactile min-h-11 px-3"
+          style={{ borderRadius: 'var(--sp-radius-pill)', background: 'color-mix(in srgb, var(--sp-ink-page) 8%, transparent)' }}
         >
           ⚙ Filtres
         </button>
@@ -128,11 +137,16 @@ export default function EcranBalayage() {
           type="button"
           aria-label="Réglages"
           onClick={() => setReglagesOuverts(true)}
-          className="min-h-11 px-3"
+          className="sp-tactile min-h-11 px-3"
+          style={{ borderRadius: 'var(--sp-radius-pill)', background: 'color-mix(in srgb, var(--sp-ink-page) 8%, transparent)' }}
         >
           ⚙︎
         </button>
-        <Link href="/salon/matchs" className="sp-meta min-h-11 flex items-center">
+        <Link
+          href="/salon/matchs"
+          className="sp-tactile sp-meta flex min-h-11 items-center"
+          style={{ padding: '0 10px', borderRadius: 'var(--sp-radius-pill)', background: 'color-mix(in srgb, var(--sp-ink-page) 8%, transparent)' }}
+        >
           {evenementsSalon.matches.length} match{evenementsSalon.matches.length > 1 ? 's' : ''}
         </Link>
       </header>
