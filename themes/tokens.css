@@ -1,0 +1,60 @@
+:root {
+  --sp-bg: #0e0e0e;
+  --sp-bg-2: #1a1a1a;
+  --sp-surface: #f5f5f5;
+  --sp-ink: #1a1a1a;
+  --sp-ink-page: var(--sp-ink);
+  --sp-ink-soft: #6b6b6b;
+  --sp-ink-page-soft: var(--sp-ink-soft);
+  --sp-accent: #e4572e;
+  --sp-accent-ink: #1a0f0a;
+  --sp-danger: #b3261e;
+  --sp-radius-card: 20px;
+  --sp-radius-pill: 999px;
+  --sp-font-display: system-ui, sans-serif;
+  --sp-font-meta: ui-monospace, monospace;
+  --sp-grain-opacity: 0;
+  --sp-shadow-card: 0 12px 32px -8px rgba(0, 0, 0, 0.4);
+}
+
+/* Traitement partagé des métadonnées (§7.2 « métadonnées en police à chasse
+   fixe » / « petites capitales espacées ») : chaque thème choisit sa police
+   via --sp-font-meta, cette classe applique le même traitement structurel
+   aux deux. */
+.sp-meta {
+  font-family: var(--sp-font-meta);
+  letter-spacing: 0.04em;
+}
+
+/* Grain partagé : chaque thème pose son opacité via --sp-grain-opacity et
+   son fond via data-bg (§8.3) ; ce pseudo-élément est le même partout. */
+.sp-page {
+  position: relative;
+  background: var(--sp-bg);
+  color: var(--sp-ink-page);
+  min-height: 100dvh;
+}
+
+.sp-page::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: var(--sp-grain-opacity);
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='120' height='120'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 0;
+}
+
+@keyframes sp-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+:focus-visible {
+  outline: 3px solid var(--sp-accent);
+  outline-offset: 2px;
+}

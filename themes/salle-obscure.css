@@ -1,0 +1,91 @@
+[data-theme='salle-obscure'] {
+  --sp-bg: #14110e;
+  --sp-bg-2: #1e1a15;
+  --sp-surface: #201b16;
+  --sp-ink: #ede6da;
+  --sp-ink-page: var(--sp-ink);
+  --sp-ink-soft: #a89c87;
+  --sp-ink-page-soft: var(--sp-ink-soft);
+  --sp-accent: #c9a227;
+  --sp-accent-ink: #14110e;
+  --sp-danger: #9a2a2a;
+  --sp-radius-card: 20px;
+  --sp-radius-pill: 999px;
+  --sp-font-display: var(--font-cinzel), serif;
+  --sp-font-meta: var(--font-eb-garamond), serif;
+  --sp-grain-opacity: 0.12;
+  --sp-shadow-card: 0 18px 44px -10px rgba(0, 0, 0, 0.8);
+}
+
+/* Traitement « petites capitales espacées » (§7.2), propre à ce thème. */
+[data-theme='salle-obscure'] .sp-meta {
+  font-variant-caps: all-small-caps;
+  letter-spacing: 0.12em;
+}
+
+/* §8.3 — uni, grain de pellicule + vignettage, texture velours, teinté par l'affiche. */
+[data-theme='salle-obscure'][data-bg='1'] {
+  --sp-grain-opacity: 0;
+}
+
+[data-theme='salle-obscure'][data-bg='2'] {
+  --sp-grain-opacity: 0.18;
+}
+
+[data-theme='salle-obscure'][data-bg='2'] .sp-page {
+  box-shadow: inset 0 0 160px 40px rgba(0, 0, 0, 0.85);
+}
+
+[data-theme='salle-obscure'][data-bg='3'] .sp-page {
+  background:
+    repeating-linear-gradient(
+      45deg,
+      rgba(237, 230, 218, 0.03) 0,
+      rgba(237, 230, 218, 0.03) 2px,
+      transparent 2px,
+      transparent 6px
+    ),
+    var(--sp-bg);
+}
+
+[data-theme='salle-obscure'][data-bg='4'] .sp-page {
+  background: linear-gradient(
+    160deg,
+    var(--sp-tint-a, var(--sp-bg)) 0%,
+    var(--sp-tint-b, var(--sp-bg)) 100%
+  );
+  transition: background 600ms ease;
+}
+
+/* §8.4 — fondu au noir puis ouverture d'un rideau sur l'affiche. */
+[data-theme='salle-obscure'] .sp-match-backdrop {
+  animation: sp-salle-fade-in 320ms ease-in;
+}
+
+[data-theme='salle-obscure'] .sp-match-card {
+  clip-path: inset(0 50% 0 50%);
+  animation: sp-salle-curtain 560ms cubic-bezier(0.16, 1, 0.3, 1) 260ms forwards;
+}
+
+@keyframes sp-salle-fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes sp-salle-curtain {
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-theme='salle-obscure'] .sp-match-backdrop,
+  [data-theme='salle-obscure'] .sp-match-card {
+    animation: sp-fade 120ms ease-out;
+    clip-path: none;
+  }
+}

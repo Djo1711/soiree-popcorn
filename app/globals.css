@@ -1,1 +1,4 @@
 @import "tailwindcss";
+@import "../themes/tokens.css";
+@import "../themes/videoclub.css";
+@import "../themes/salle-obscure.css";
