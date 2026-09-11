@@ -93,7 +93,18 @@ pnpm test                    # doit afficher 227 passed
 | `SESSION_SECRET` | À régénérer : `openssl rand -hex 32`. La changer déconnecte les sessions existantes, sans autre conséquence. |
 | `CRON_SECRET` | À régénérer de la même façon. |
 
-**Note pour Vercel :** au déploiement, ces quatre variables devront être déclarées dans les réglages du projet. Le projet n'est **pas encore lié à Vercel** à ce jour (9 septembre 2026) — `vercel.json` existe (cron hebdomadaire d'ingestion) mais aucun déploiement n'a été fait. L'intégration Neon peut injecter `DATABASE_URL` toute seule une fois le projet importé sur Vercel.
+### Déployé sur Vercel
+
+**Depuis le 11 septembre 2026**, le projet est en ligne : **https://soiree-popcorn.vercel.app** (compte personnel « Geoffroy BL's projects », projet `soiree-popcorn`, importé depuis `Djo1711/soiree-popcorn`). Le déploiement se redéclenche automatiquement à chaque push sur `main`.
+
+Deux pièges rencontrés à la mise en place, à ne pas refaire :
+
+1. **Ne jamais coller une ligne `.env` entière dans le champ Value de Vercel.** Le champ *Key* porte déjà le nom de la variable ; le champ *Value* ne doit contenir que ce qui suit le `=`. Coller `DATABASE_URL=postgresql://...` dans *Value* produit une variable dont le contenu commence littéralement par `DATABASE_URL=`, ce qui casse le parsing de l'URL (`TypeError: Invalid URL`) sans que Vercel ne le signale à la saisie.
+2. **`WS_NO_BUFFER_UTIL=1` est nécessaire en production, pas seulement en dev.** `lib/db/client.ts` utilise `Pool` de `@neondatabase/serverless` (connexion WebSocket via `ws`, indispensable aux transactions explicites du projet) plutôt que le pilote HTTP sans état — le même problème natif `bufferUtil.mask is not a function` rencontré en local avec `next dev` (voir tâche 17 du plan 3) se reproduit dans l'environnement Node serverless de Vercel. La variable est un simple indicateur, pas un secret : elle est déclarée en type *Config* (visible, pas *Secret*) dans les réglages du projet, pour Production et Preview.
+
+Les 5 variables déclarées dans le projet Vercel : `DATABASE_URL`, `TMDB_READ_TOKEN`, `SESSION_SECRET`, `CRON_SECRET` (les 4 secrets ci-dessus) et `WS_NO_BUFFER_UTIL` (config, valeur `1`).
+
+**Note pour une prochaine importation** (autre machine, autre compte) : au moment de l'import Git sur vercel.com/new, l'écran « Environment Variables » détecte les 4 clés depuis `.env.example` mais laisse leurs *Value* vides — il est facile de cliquer « Create Project » sans les remplir. Mieux vaut les remplir dès cet écran, ou aller dans Settings → Environment Variables juste après, plutôt que de découvrir l'erreur en production.
 
 ---
 
