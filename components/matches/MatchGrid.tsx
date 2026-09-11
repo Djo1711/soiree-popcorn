@@ -27,8 +27,8 @@ export function MatchGrid({
             key={match.matchId}
             type="button"
             onClick={() => setOuvert(match)}
-            className="relative overflow-hidden text-left"
-            style={{ borderRadius: 'var(--sp-radius-card)' }}
+            className="sp-tactile relative overflow-hidden text-left"
+            style={{ borderRadius: 'var(--sp-radius-card)', boxShadow: 'var(--sp-shadow-card)' }}
           >
             {match.movie.posterPath ? (
               // eslint-disable-next-line @next/next/no-img-element -- grille dense, pas de next/image nécessaire ici
@@ -61,7 +61,7 @@ export function MatchGrid({
         >
           <div className="absolute inset-0" style={{ background: 'rgba(0, 0, 0, 0.5)' }} />
           <div
-            className="relative z-10 w-full p-6"
+            className="sp-enter relative z-10 w-full p-6"
             style={{
               background: 'var(--sp-bg-2)',
               color: 'var(--sp-ink)',
@@ -84,8 +84,11 @@ export function MatchGrid({
                       onChangerStatut(ouvert.movie.id, statut)
                       setOuvert(null)
                     }}
-                    className="min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border"
-                    style={{ borderColor: 'var(--sp-ink-soft)' }}
+                    className="sp-tactile min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border"
+                    style={{
+                      borderColor: 'var(--sp-ink-soft)',
+                      boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-soft) 65%, black)',
+                    }}
                   >
                     {LIBELLES_STATUT[statut]}
                   </button>

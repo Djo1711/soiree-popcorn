@@ -177,7 +177,8 @@ export default function Home() {
           <button
             type="submit"
             disabled={enCours}
-            className="min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+            className="sp-tactile min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+            style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)' }}
           >
             {enCours ? 'Création…' : 'Créer'}
           </button>
@@ -201,15 +202,19 @@ export default function Home() {
             setCopie(true)
             setTimeout(() => setCopie(false), 1500)
           }}
-          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-6 py-3"
-          style={{ borderColor: 'var(--sp-ink-page-soft)' }}
+          className="sp-tactile min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-6 py-3"
+          style={{
+            borderColor: 'var(--sp-ink-page-soft)',
+            boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-page-soft) 65%, black)',
+          }}
         >
           {copie ? 'Lien copié !' : 'Copier le lien à partager'}
         </button>
         <button
           type="button"
           onClick={() => router.push('/salon')}
-          className="min-h-11 w-full rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)]"
+          className="sp-tactile min-h-11 w-full rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)]"
+          style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)' }}
         >
           Continuer
         </button>
@@ -243,7 +248,8 @@ export default function Home() {
         <button
           type="submit"
           disabled={enCours}
-          className="min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+          className="sp-tactile min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+          style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)' }}
         >
           {enCours ? 'Adhésion…' : 'Rejoindre'}
         </button>

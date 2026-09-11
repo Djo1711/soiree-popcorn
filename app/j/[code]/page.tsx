@@ -83,14 +83,15 @@ export default function AdhesionParLien({ params }: { params: Promise<{ code: st
         <button
           type="submit"
           disabled={enCours || !valide}
-          className="min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+          className="sp-tactile min-h-11 rounded-[var(--sp-radius-pill)] bg-[var(--sp-accent)] px-6 py-3 text-[var(--sp-accent-ink)] disabled:opacity-60"
+          style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)' }}
         >
           {enCours ? 'Adhésion…' : 'Rejoindre'}
         </button>
       </form>
 
       {membres && membres.length > 0 && (
-        <div className="flex flex-col gap-2 border-t border-[var(--sp-ink-page-soft)] pt-4">
+        <div className="sp-enter flex flex-col gap-2 border-t border-[var(--sp-ink-page-soft)] pt-4">
           <p className="sp-meta text-sm">Ou reprends une identité déjà présente dans ce salon :</p>
           <div className="flex flex-col gap-2">
             {membres.map((membre) => (
@@ -99,7 +100,8 @@ export default function AdhesionParLien({ params }: { params: Promise<{ code: st
                 type="button"
                 onClick={() => reprendre(membre)}
                 disabled={reprise !== null}
-                className="min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4 disabled:opacity-60"
+                className="sp-tactile min-h-11 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-page-soft)] px-4 disabled:opacity-60"
+                style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-page-soft) 65%, black)' }}
               >
                 {reprise === membre.id ? 'Reprise…' : membre.displayName}
               </button>

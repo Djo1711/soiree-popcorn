@@ -77,7 +77,7 @@ export function FilterSheet({
     <div className="fixed inset-0 z-20 flex items-end" onClick={onFermer}>
       <div className="absolute inset-0" style={{ background: 'rgba(0, 0, 0, 0.5)' }} />
       <div
-        className="relative z-10 max-h-[85dvh] w-full overflow-y-auto p-6"
+        className="sp-enter relative z-10 max-h-[85dvh] w-full overflow-y-auto p-6"
         style={{
           background: 'var(--sp-bg-2)',
           color: 'var(--sp-ink)',
@@ -91,50 +91,59 @@ export function FilterSheet({
         <fieldset className="mb-4">
           <legend className="sp-meta mb-2 text-sm">Genres</legend>
           <div className="flex flex-wrap gap-2">
-            {GENRES.map((genre) => (
-              <button
-                key={genre}
-                type="button"
-                onClick={() => basculerGenre(genre)}
-                className="min-h-11 px-3 text-sm"
-                style={{
-                  borderRadius: 'var(--sp-radius-pill)',
-                  background: filtres.genres.includes(genre) ? 'var(--sp-accent)' : 'var(--sp-surface)',
-                  color: filtres.genres.includes(genre) ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
-                }}
-              >
-                {genre}
-              </button>
-            ))}
+            {GENRES.map((genre) => {
+              const actif = filtres.genres.includes(genre)
+              return (
+                <button
+                  key={genre}
+                  type="button"
+                  onClick={() => basculerGenre(genre)}
+                  className="sp-tactile min-h-11 px-3 text-sm"
+                  style={{
+                    borderRadius: 'var(--sp-radius-pill)',
+                    background: actif ? 'var(--sp-accent)' : 'var(--sp-surface)',
+                    color: actif ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
+                    boxShadow: `0 3px 0 color-mix(in srgb, ${actif ? 'var(--sp-accent)' : 'var(--sp-surface)'} 65%, black)`,
+                  }}
+                >
+                  {genre}
+                </button>
+              )
+            })}
           </div>
         </fieldset>
 
         <fieldset className="mb-4">
           <legend className="sp-meta mb-2 text-sm">Plateformes</legend>
           <div className="flex flex-wrap gap-2">
-            {PLATEFORMES.map(({ cle, nom }) => (
-              <button
-                key={cle}
-                type="button"
-                onClick={() => basculerPlateforme(cle)}
-                className="min-h-11 px-3 text-sm"
-                style={{
-                  borderRadius: 'var(--sp-radius-pill)',
-                  background: filtres.providers.includes(cle) ? 'var(--sp-accent)' : 'var(--sp-surface)',
-                  color: filtres.providers.includes(cle) ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
-                }}
-              >
-                {nom}
-              </button>
-            ))}
+            {PLATEFORMES.map(({ cle, nom }) => {
+              const actif = filtres.providers.includes(cle)
+              return (
+                <button
+                  key={cle}
+                  type="button"
+                  onClick={() => basculerPlateforme(cle)}
+                  className="sp-tactile min-h-11 px-3 text-sm"
+                  style={{
+                    borderRadius: 'var(--sp-radius-pill)',
+                    background: actif ? 'var(--sp-accent)' : 'var(--sp-surface)',
+                    color: actif ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
+                    boxShadow: `0 3px 0 color-mix(in srgb, ${actif ? 'var(--sp-accent)' : 'var(--sp-surface)'} 65%, black)`,
+                  }}
+                >
+                  {nom}
+                </button>
+              )
+            })}
             <button
               type="button"
               onClick={() => setFiltres((f) => ({ ...f, includeTop200: !f.includeTop200 }))}
-              className="min-h-11 px-3 text-sm"
+              className="sp-tactile min-h-11 px-3 text-sm"
               style={{
                 borderRadius: 'var(--sp-radius-pill)',
                 background: filtres.includeTop200 ? 'var(--sp-accent)' : 'var(--sp-surface)',
                 color: filtres.includeTop200 ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
+                boxShadow: `0 3px 0 color-mix(in srgb, ${filtres.includeTop200 ? 'var(--sp-accent)' : 'var(--sp-surface)'} 65%, black)`,
               }}
             >
               Top 200
@@ -203,15 +212,20 @@ export function FilterSheet({
           <button
             type="button"
             onClick={() => setFiltres(FILTRES_VIDES)}
-            className="min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)]"
+            className="sp-tactile min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border border-[var(--sp-ink-soft)]"
+            style={{ boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-soft) 65%, black)' }}
           >
             Réinitialiser
           </button>
           <button
             type="button"
             onClick={appliquer}
-            className="min-h-11 flex-1 rounded-[var(--sp-radius-pill)]"
-            style={{ background: 'var(--sp-accent)', color: 'var(--sp-accent-ink)' }}
+            className="sp-tactile min-h-11 flex-1 rounded-[var(--sp-radius-pill)]"
+            style={{
+              background: 'var(--sp-accent)',
+              color: 'var(--sp-accent-ink)',
+              boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)',
+            }}
           >
             Appliquer
           </button>

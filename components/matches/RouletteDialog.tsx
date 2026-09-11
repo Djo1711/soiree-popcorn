@@ -3,6 +3,7 @@
 import { motion, useReducedMotion } from 'motion/react'
 import { useEffect, useState } from 'react'
 import { tirerAuSort } from '@/lib/api-client'
+import { enterDelay } from '@/lib/entrance'
 import { DUREE_ROULETTE_MS, easeRoulette } from '@/lib/roulette'
 import type { MatchRow } from '@/lib/db/queries/matches'
 
@@ -79,23 +80,35 @@ export function RouletteDialog({ ouverte, onFermer }: { ouverte: boolean; onFerm
       </div>
       {tirage === 'termine' && (
         <>
-          <h3 style={{ fontFamily: 'var(--sp-font-display)' }} className="text-xl">
+          <h3
+            style={{ fontFamily: 'var(--sp-font-display)', ...enterDelay('0ms') }}
+            className="sp-enter text-xl"
+          >
             {gagnant ? gagnant.movie.title : erreur ? 'Une erreur est survenue.' : 'Aucun film à voir pour l’instant.'}
           </h3>
           <div className="flex gap-2">
             <button
               type="button"
               onClick={() => setTentative((t) => t + 1)}
-              className="min-h-11 rounded-[var(--sp-radius-pill)] border px-4"
-              style={{ borderColor: 'var(--sp-ink-page-soft)' }}
+              className="sp-tactile sp-enter min-h-11 rounded-[var(--sp-radius-pill)] border px-4"
+              style={{
+                borderColor: 'var(--sp-ink-page-soft)',
+                boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-page-soft) 65%, black)',
+                ...enterDelay('90ms'),
+              }}
             >
               Relancer
             </button>
             <button
               type="button"
               onClick={onFermer}
-              className="min-h-11 rounded-[var(--sp-radius-pill)] px-4"
-              style={{ background: 'var(--sp-accent)', color: 'var(--sp-accent-ink)' }}
+              className="sp-tactile sp-enter min-h-11 rounded-[var(--sp-radius-pill)] px-4"
+              style={{
+                background: 'var(--sp-accent)',
+                color: 'var(--sp-accent-ink)',
+                boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)',
+                ...enterDelay('160ms'),
+              }}
             >
               Fermer
             </button>

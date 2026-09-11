@@ -42,7 +42,7 @@ export function SettingsSheet({
     <div className="fixed inset-0 z-20 flex items-end" onClick={onFermer}>
       <div className="absolute inset-0" style={{ background: 'rgba(0, 0, 0, 0.5)' }} />
       <div
-        className="relative z-10 max-h-[85dvh] w-full overflow-y-auto p-6"
+        className="sp-enter relative z-10 max-h-[85dvh] w-full overflow-y-auto p-6"
         style={{
           background: 'var(--sp-bg-2)',
           color: 'var(--sp-ink)',
@@ -57,8 +57,8 @@ export function SettingsSheet({
             type="button"
             onClick={onFermer}
             aria-label="Fermer"
-            className="h-11 w-11 rounded-full"
-            style={{ background: 'var(--sp-surface)' }}
+            className="sp-tactile h-11 w-11 rounded-full"
+            style={{ background: 'var(--sp-surface)', boxShadow: '0 3px 0 color-mix(in srgb, var(--sp-surface) 65%, black)' }}
           >
             ↓
           </button>
@@ -72,11 +72,13 @@ export function SettingsSheet({
                 key={t}
                 type="button"
                 onClick={() => definirTheme(t)}
-                className="min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border px-3"
+                className="sp-tactile min-h-11 flex-1 rounded-[var(--sp-radius-pill)] border px-3"
                 style={{
                   borderColor: theme === t ? 'var(--sp-accent)' : 'var(--sp-ink-soft)',
                   background: theme === t ? 'var(--sp-accent)' : 'transparent',
                   color: theme === t ? 'var(--sp-accent-ink)' : 'var(--sp-ink)',
+                  boxShadow:
+                    theme === t ? '0 4px 0 color-mix(in srgb, var(--sp-accent) 65%, black)' : undefined,
                 }}
               >
                 {LIBELLES_THEME[t]}
@@ -96,7 +98,7 @@ export function SettingsSheet({
                 onClick={() => definirFond(f)}
                 data-theme={theme}
                 data-bg={f}
-                className="aspect-square min-h-11"
+                className="sp-tactile aspect-square min-h-11"
                 style={{
                   borderRadius: 'var(--sp-radius-card)',
                   border: fond === f ? '3px solid var(--sp-accent)' : '1px solid var(--sp-ink-soft)',
@@ -118,8 +120,8 @@ export function SettingsSheet({
               setCopie(true)
               setTimeout(() => setCopie(false), 1500)
             }}
-            className="min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-3"
-            style={{ borderColor: 'var(--sp-ink-soft)' }}
+            className="sp-tactile min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-3"
+            style={{ borderColor: 'var(--sp-ink-soft)', boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-ink-soft) 65%, black)' }}
           >
             {copie ? 'Lien copié !' : 'Copier le lien du salon'}
           </button>
@@ -129,8 +131,12 @@ export function SettingsSheet({
           type="button"
           onClick={quitter}
           disabled={enCours}
-          className="block min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-3 py-2 text-center disabled:opacity-60"
-          style={{ borderColor: 'var(--sp-danger)', color: 'var(--sp-danger)' }}
+          className="sp-tactile block min-h-11 w-full rounded-[var(--sp-radius-pill)] border px-3 py-2 text-center disabled:opacity-60"
+          style={{
+            borderColor: 'var(--sp-danger)',
+            color: 'var(--sp-danger)',
+            boxShadow: '0 4px 0 color-mix(in srgb, var(--sp-danger) 55%, black)',
+          }}
         >
           {enCours ? 'Sortie…' : 'Quitter le salon'}
         </button>
